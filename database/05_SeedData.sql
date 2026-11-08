@@ -329,6 +329,280 @@ BEGIN
 END;
 GO
 
-PRINT 'Enterprise realistic development seed data populated successfully.';
+-- ============================================================================
+-- 8. DYNAMIC WEBSITE CMS SEED DATA
+-- ============================================================================
+
+-- Global Website Branding & Settings
+IF NOT EXISTS (SELECT 1 FROM dbo.WebsiteSettings WHERE RestaurantId = 1)
+BEGIN
+    INSERT INTO dbo.WebsiteSettings (
+        RestaurantId, BranchId, SiteTitle, Tagline,
+        HeaderLogoUrl, HeaderLogoPublicId, FooterLogoUrl, FooterLogoPublicId, FaviconUrl,
+        PrimaryColor, SecondaryColor, AccentColor, FontFamily,
+        ContactEmail, ContactPhone, WhatsappNumber, AddressLine, GoogleMapsEmbedUrl
+    ) VALUES (
+        1, NULL, N'Antigravity Gourmet Bistro', N'Artisanal Wood-Fired Gastronomy & Craft Cocktails',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/logo-header.png', N'restaurant/logo-header',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/logo-footer.png', N'restaurant/logo-footer',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/favicon.ico',
+        N'#D90429', N'#2B2D42', N'#EDF2F4', N'Plus Jakarta Sans, sans-serif',
+        N'reservations@antigravitybistro.com', N'+91 80 4123 4567', N'+91 98765 43210',
+        N'100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038',
+        N'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3887.9855!2d77.639!3d12.971!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTLCsDU4JzE1LjYiTiA3N8KwMzgnMjAuNCJF!5e0!3m2!1sen!2sin!4v1600000000000'
+    );
+    PRINT 'Seed: Website Settings & Branding created.';
+END;
+GO
+
+-- Global SEO & Structured Data
+IF NOT EXISTS (SELECT 1 FROM dbo.SEOSettings WHERE RestaurantId = 1 AND PageId IS NULL)
+BEGIN
+    INSERT INTO dbo.SEOSettings (
+        RestaurantId, PageId, MetaTitle, MetaDescription, MetaKeywords,
+        CanonicalUrl, OgTitle, OgDescription, OgImageUrl, OgImagePublicId,
+        StructuredDataJson
+    ) VALUES (
+        1, NULL,
+        N'Antigravity Bistro | Best Gourmet Wood-Fired Dining in Bengaluru',
+        N'Experience authentic 48-hour fermented Neapolitan pizzas, handcrafted pastas, and artisanal cocktails in an enchanting contemporary ambiance in Indiranagar, Bengaluru.',
+        N'restaurant, bistro, wood fired pizza, artisanal pasta, cocktails, fine dining, indiranagar, bangalore',
+        N'https://antigravitybistro.com',
+        N'Antigravity Bistro | Artisanal Wood-Fired Gastronomy',
+        N'Award-winning gourmet Italian bistro & lounge in the heart of Bengaluru.',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/og-banner.jpg',
+        N'restaurant/og-banner',
+        N'{"@context":"https://schema.org","@type":"Restaurant","name":"Antigravity Gourmet Bistro","image":"https://res.cloudinary.com/demo/image/upload/v1/restaurant/og-banner.jpg","servesCuisine":["Italian","Contemporary","Artisanal"],"priceRange":"$$","telephone":"+918041234567"}'
+    );
+    PRINT 'Seed: SEO Meta Tags and Schema.org structured data created.';
+END;
+GO
+
+-- Homepage Banners (Hero Carousel)
+IF NOT EXISTS (SELECT 1 FROM dbo.WebsiteBanners WHERE BannerTitle = 'Artisanal Wood-Fired Gastronomy')
+BEGIN
+    INSERT INTO dbo.WebsiteBanners (
+        RestaurantId, BranchId, BannerTitle, Subtitle, BadgeText,
+        ButtonText, ButtonLink, SecondaryButtonText, SecondaryButtonLink,
+        ImageUrl, ImagePublicId, MobileImageUrl, BannerLocation, DisplayOrder
+    ) VALUES
+    (
+        1, 1, N'Artisanal Wood-Fired Gastronomy',
+        N'48-hour slow-fermented Neapolitan sourdough pizzas baked at 450 degrees in our imported volcanic stone oven.',
+        N'Michelin Recommended Chef',
+        N'Explore Food Menu', N'/menu',
+        N'Book Table', N'/reserve',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/hero-pizza.jpg', N'restaurant/hero-pizza',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/hero-pizza-mobile.jpg',
+        'HOME_HERO', 1
+    ),
+    (
+        1, 1, N'Handcrafted Pasta & Curated Cocktails',
+        N'Fresh bronze-cut pastas tossed in 24-month aged Parmigiano Reggiano, paired with botanical craft mixology.',
+        N'Weekend Tasting Flights',
+        N'Reserve Your Seat', N'/reserve',
+        N'View Bar Menu', N'/menu?cat=beverages',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/hero-cocktail.jpg', N'restaurant/hero-cocktail',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/hero-cocktail-mobile.jpg',
+        'HOME_HERO', 2
+    );
+    PRINT 'Seed: Hero Banners created with Cloudinary CDN references.';
+END;
+GO
+
+-- Navigation Menus (Header & Quick Links)
+IF NOT EXISTS (SELECT 1 FROM dbo.NavigationMenus WHERE Title = 'Home')
+BEGIN
+    INSERT INTO dbo.NavigationMenus (RestaurantId, ParentMenuId, MenuLocation, Title, TargetUrl, OpenInNewTab, DisplayOrder, IconName) VALUES
+    (1, NULL, 'HEADER', N'Home', N'/', 0, 1, 'HomeOutlined'),
+    (1, NULL, 'HEADER', N'Menu', N'/menu', 0, 2, 'BookOutlined'),
+    (1, NULL, 'HEADER', N'Reservations', N'/reserve', 0, 3, 'CalendarOutlined'),
+    (1, NULL, 'HEADER', N'Our Story', N'/about', 0, 4, 'HeartOutlined'),
+    (1, NULL, 'HEADER', N'Private Dining', N'/private-dining', 0, 5, 'CrownOutlined'),
+    (1, NULL, 'HEADER', N'Contact', N'/contact', 0, 6, 'EnvironmentOutlined');
+    PRINT 'Seed: Header Navigation Menu items created.';
+END;
+GO
+
+-- Dynamic Website Pages
+IF NOT EXISTS (SELECT 1 FROM dbo.WebsitePages WHERE PageSlug = 'home')
+BEGIN
+    SET IDENTITY_INSERT dbo.WebsitePages ON;
+    INSERT INTO dbo.WebsitePages (
+        PageId, RestaurantId, BranchId, PageTitle, PageSlug, PageType,
+        HeroBannerTitle, HeroBannerSubtitle, HeroImageUrl, Status, PublishedAt, DisplayOrder, IsSystemPage
+    ) VALUES
+    (
+        1, 1, NULL, N'Home', N'home', 'HOME',
+        N'Antigravity Gourmet Bistro', N'Savor authentic culinary craftsmanship',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/hero-home.jpg',
+        'PUBLISHED', SYSUTCDATETIME(), 1, 1
+    ),
+    (
+        2, 1, NULL, N'About Our Culinary Heritage', N'about', 'ABOUT',
+        N'A Passion Born from Fire & Dough', N'Meet Executive Chef Marco Rossi and our philosophy of seasonal purity',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/chef-story.jpg',
+        'PUBLISHED', SYSUTCDATETIME(), 2, 1
+    ),
+    (
+        3, 1, NULL, N'Private Dining & Celebrations', N'private-dining', 'SERVICES',
+        N'Exclusive Gastronomic Experiences', N'Host your corporate banquets, anniversaries, and wine tasting soirees',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/private-room.jpg',
+        'PUBLISHED', SYSUTCDATETIME(), 3, 0
+    ),
+    (
+        4, 1, NULL, N'Connect With Us', N'contact', 'CONTACT',
+        N'Find Your Way to Antigravity', N'Located in Indiranagar and Koramangala with valet parking',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/contact-exterior.jpg',
+        'PUBLISHED', SYSUTCDATETIME(), 4, 1
+    );
+    SET IDENTITY_INSERT dbo.WebsitePages OFF;
+    PRINT 'Seed: Dynamic Website Pages created.';
+END;
+GO
+
+-- Dynamic Page Sections for Homepage (PageId = 1)
+IF NOT EXISTS (SELECT 1 FROM dbo.WebsitePageSections WHERE PageId = 1 AND SectionKey = 'home_hero')
+BEGIN
+    INSERT INTO dbo.WebsitePageSections (
+        PageId, SectionKey, SectionTitle, SectionSubtitle, ComponentType,
+        ContentDataJson, BackgroundType, DisplayOrder, IsActive
+    ) VALUES
+    (
+        1, N'home_hero', N'Hero Carousel', NULL, 'HERO_SLIDER',
+        N'{"autoPlayInterval":5000,"showIndicators":true,"showArrows":true}',
+        'COLOR', 1, 1
+    ),
+    (
+        1, N'home_about', N'Our Culinary Philosophy', N'Where ancient tradition meets culinary rebellion', 'ABOUT_STORY',
+        N'{"storyHeadline":"Fermentation, Fire & Farm-to-Table Purity","storyBody":"Every morning begins at 5 AM with our 48-hour fermented sourdough mother culture. Sourced directly from local organic farmers, our produce represents the peak of harvest seasonal purity.","chefName":"Chef Marco Rossi","yearsExperience":18,"awards":["Best Italian Restaurant 2025","Culinary Excellence Gold"]}',
+        'COLOR', 2, 1
+    ),
+    (
+        1, N'home_featured', N'Chef Recommendations', N'Handcrafted masterpieces loved by our patrons', 'FEATURED_MENU',
+        N'{"itemCodes":["PIZ-001","PIZ-002","PAS-001","BGR-001"],"viewAllLink":"/menu"}',
+        'COLOR', 3, 1
+    ),
+    (
+        1, N'home_stats', N'Bistro By The Numbers', NULL, 'STATS_COUNTER',
+        N'{"stats":[{"value":450,"unit":"C","label":"Wood-Fired Oven Heat"},{"value":48,"unit":"Hours","label":"Dough Fermentation"},{"value":98,"unit":"%","label":"Guest Satisfaction"},{"value":12,"unit":"Thousand","label":"Happy Diners Monthly"}]}',
+        'COLOR', 4, 1
+    ),
+    (
+        1, N'home_reviews', N'Critical Acclaim & Guest Voices', N'What Bangalore food lovers and critics say about us', 'TESTIMONIALS_GRID',
+        N'{"layout":"CAROUSEL","featuredOnly":true,"autoScroll":true}',
+        'COLOR', 5, 1
+    ),
+    (
+        1, N'home_reserve_cta', N'An Unforgettable Evening Awaits', N'Reserve your intimate dining table or private terrace booth', 'RESERVATION_CTA',
+        N'{"buttonText":"Reserve Your Table Online","buttonLink":"/reserve","badge":"Limited Weekend Seating"}',
+        'IMAGE', 6, 1
+    ),
+    (
+        1, N'home_faq', N'Frequently Asked Questions', N'Everything you need to know before visiting', 'FAQ_ACCORDION',
+        N'{"defaultCategory":"ALL","expandFirst":true}',
+        'COLOR', 7, 1
+    );
+    PRINT 'Seed: Modular Homepage Sections populated.';
+END;
+GO
+
+-- Testimonials & Critic Reviews
+IF NOT EXISTS (SELECT 1 FROM dbo.Testimonials WHERE AuthorName = 'Ananya Sen')
+BEGIN
+    INSERT INTO dbo.Testimonials (
+        RestaurantId, AuthorName, AuthorRole, AuthorAvatarUrl, Rating,
+        ReviewContent, SourcePlatform, IsFeatured, DisplayOrder
+    ) VALUES
+    (
+        1, N'Ananya Sen', N'Food Editor, Bangalore Times',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/avatar-critic.jpg', 5,
+        N'The Margherita Classica is hands-down the finest Neapolitan pizza in South India. The dough has an airy, blistered cornicione with impeccable flavor depth.',
+        'PRESS', 1, 1
+    ),
+    (
+        1, N'Karan Malhotra', N'Verified Diner & Sommelier',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/avatar-diner1.jpg', 5,
+        N'Exceptional service from the moment you step in. The Truffle Fettuccine paired with their signature Yuzu Sparkler made our anniversary unforgettable.',
+        'GOOGLE', 1, 2
+    ),
+    (
+        1, N'Dr. Sneha Reddy', N'Local Guide',
+        N'https://res.cloudinary.com/demo/image/upload/v1/restaurant/avatar-diner2.jpg', 5,
+        N'Loved the contactless table QR ordering experience! We added extra cheeses and desserts straight from our phone, and the dishes arrived blazing hot within 15 minutes.',
+        'TRIPADVISOR', 1, 3
+    );
+    PRINT 'Seed: Curated Testimonials created.';
+END;
+GO
+
+-- Frequently Asked Questions (FAQs)
+IF NOT EXISTS (SELECT 1 FROM dbo.FAQs WHERE Question LIKE '%table reservation%')
+BEGIN
+    INSERT INTO dbo.FAQs (RestaurantId, Category, Question, Answer, DisplayOrder) VALUES
+    (
+        1, 'RESERVATIONS',
+        N'Do I need to book a table reservation in advance?',
+        N'While walk-in guests are always warmly welcomed, we strongly recommend booking in advance for Friday to Sunday evenings to guarantee your preferred seating area (Main Dining Room, Garden Terrace, or High-Top Bar).',
+        1
+    ),
+    (
+        1, 'DIETARY',
+        N'Do you offer vegan, gluten-free, or Jain culinary options?',
+        N'Yes! Our menu features clearly marked vegan dishes, dairy-free substitutions, and cauliflower-crust gluten-free pizza options. Please notify our floor waitstaff or add cooking notes during QR ordering.',
+        2
+    ),
+    (
+        1, 'SERVICES',
+        N'Is valet parking available at your branches?',
+        N'Yes, complimentary valet parking is available at both our Indiranagar and Koramangala flagship branches during full lunch and dinner operating hours.',
+        3
+    ),
+    (
+        1, 'EVENTS',
+        N'Can I book a private hall or rooftop section for private gatherings?',
+        N'Yes! Our AC Garden Terrace and Rooftop Lounge can host private parties, birthdays, and corporate celebrations for 20 to 120 guests. Please submit a request via our Private Dining contact form.',
+        4
+    );
+    PRINT 'Seed: FAQs created.';
+END;
+GO
+
+-- Social Media Links
+IF NOT EXISTS (SELECT 1 FROM dbo.SocialMediaLinks WHERE PlatformName = 'INSTAGRAM')
+BEGIN
+    INSERT INTO dbo.SocialMediaLinks (RestaurantId, PlatformName, PlatformUrl, IconKey, DisplayOrder) VALUES
+    (1, 'INSTAGRAM', N'https://instagram.com/antigravitybistro', 'InstagramOutlined', 1),
+    (1, 'FACEBOOK', N'https://facebook.com/antigravitybistro', 'FacebookOutlined', 2),
+    (1, 'TRIPADVISOR', N'https://tripadvisor.com/Restaurant_Review-AntigravityBistro', 'GlobalOutlined', 3),
+    (1, 'YOUTUBE', N'https://youtube.com/@antigravitybistro', 'YoutubeOutlined', 4);
+    PRINT 'Seed: Social Media Links created.';
+END;
+GO
+
+-- Footer Sections (Multi-Column Layout)
+IF NOT EXISTS (SELECT 1 FROM dbo.FooterSections WHERE SectionTitle = 'Operating Hours')
+BEGIN
+    INSERT INTO dbo.FooterSections (RestaurantId, SectionTitle, ContentType, ContentHtml, DisplayOrder) VALUES
+    (
+        1, N'Operating Hours', 'HOURS',
+        N'<p><strong>Monday - Thursday:</strong> 11:00 AM - 11:00 PM</p><p><strong>Friday - Sunday:</strong> 10:00 AM - 12:00 AM Midnight</p><p class="bistro-note">Valet parking available during all open hours.</p>',
+        1
+    ),
+    (
+        1, N'Quick Navigation', 'LINKS',
+        N'<ul><li><a href="/menu">Full Food & Bar Menu</a></li><li><a href="/reserve">Reserve Dining Table</a></li><li><a href="/about">Our Sourdough Story</a></li><li><a href="/private-dining">Private Dining & Events</a></li></ul>',
+        2
+    ),
+    (
+        1, N'Bistro Newsletter', 'NEWSLETTER',
+        N'<p>Subscribe for invitations to seasonal tasting menus, chef wine pairings, and exclusive dining privileges.</p>',
+        3
+    );
+    PRINT 'Seed: Footer Sections created.';
+END;
+GO
+
+PRINT 'Enterprise realistic development seed data (Core + Dynamic CMS) populated successfully.';
 GO
 

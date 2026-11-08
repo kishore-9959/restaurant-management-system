@@ -72,6 +72,17 @@
 | 42 | CustomerReviews            | Customer Reviews      | Ratings (Food, Service, Ambience)       |
 | 43 | Notifications              | Notifications         | User & staff real-time system alerts    |
 | 44 | AuditLogs                  | Audit Logs            | Immutable administrative change logs     |
+| 45 | WebsiteSettings            | Dynamic Website CMS   | Global site branding, logos & colors    |
+| 46 | SEOSettings                | Dynamic Website CMS   | Search engine metadata & Open Graph     |
+| 47 | WebsitePages               | Dynamic Website CMS   | Dynamic pages (Home, About, Services)   |
+| 48 | WebsitePageSections        | Dynamic Website CMS   | Modular page blocks with flexible JSON  |
+| 49 | WebsiteBanners             | Dynamic Website CMS   | Hero sliders & promotional banners      |
+| 50 | NavigationMenus            | Dynamic Website CMS   | Header & mobile navigation tree         |
+| 51 | FooterSections             | Dynamic Website CMS   | Multi-column footer layout              |
+| 52 | FAQs                       | Dynamic Website CMS   | Categorized guest questions & answers   |
+| 53 | Testimonials               | Dynamic Website CMS   | Curated guest & critic testimonials     |
+| 54 | SocialMediaLinks           | Dynamic Website CMS   | Social media channels & links           |
+| 55 | ContactMessages            | Dynamic Website CMS   | Inbound contact form inquiries          |
 +----+----------------------------+-----------------------+-----------------------------------------+
 ```
 
@@ -133,6 +144,19 @@
 - `CustomerReviews`: Star ratings (Overall, Food, Service, Ambience) and management replies.
 - `Notifications`: Real-time system notifications pushed to users and staff.
 - `AuditLogs`: Security and financial audit trail capturing IP addresses, actors, and JSON diffs (`OldValuesJson`, `NewValuesJson`).
+
+#### 3.10 Dynamic Website CMS & Digital Storefront
+- `WebsiteSettings`: Global site branding, logos (header, footer, favicon), color palettes, contact info, and Google Maps embed.
+- `SEOSettings`: Page-level and global meta titles, descriptions, keywords, Open Graph, Twitter cards, and Schema.org structured data.
+- `WebsitePages`: Content pages (`Home`, `About Us`, `Private Dining`, `Contact`) with Draft/Published workflow.
+- `WebsitePageSections`: Modular page sections (`HERO_SLIDER`, `ABOUT_STORY`, `FEATURED_MENU`, `CHEF_FEATURE`, `SERVICES_LIST`, `STATS_COUNTER`, `TESTIMONIALS_GRID`, `FAQ_ACCORDION`, `RESERVATION_CTA`) rendered dynamically via frontend registry.
+- `WebsiteBanners`: Hero sliders and promotional banners with scheduling dates and Cloudinary image assets.
+- `NavigationMenus`: Multi-tier header, mobile drawer, and footer navigation links.
+- `FooterSections`: Multi-column footer management (Hours, Quick Links, Newsletter, Custom HTML).
+- `FAQs`: Categorized guest questions and answers.
+- `Testimonials`: Curated press quotes and diner endorsements with ratings and author roles.
+- `SocialMediaLinks`: Configurable social media platform icons and links.
+- `ContactMessages`: Inbound customer messages and private dining inquiries with status tracking.
 
 ---
 

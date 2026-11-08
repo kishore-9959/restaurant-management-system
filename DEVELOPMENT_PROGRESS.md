@@ -51,8 +51,15 @@
     4. `sp_CloseCashRegisterShift` (Float balancing & Z-report over/short calculation)
     5. `sp_CheckTableAvailability` (Reservation slot conflict prevention)
 - [x] **Master Architectural Documentation**:
-  - `documentation/DATABASE_DESIGN.md`: Complete Data Dictionary, table inventory, and referential rules.
+  - `documentation/DATABASE_DESIGN.md`: Complete Data Dictionary, 55-table inventory, and referential rules.
   - `documentation/ER_DIAGRAM.md`: Comprehensive domain ER diagrams rendered in Mermaid syntax.
+  - `documentation/DYNAMIC_CMS_DESIGN.md`: Full architectural specification for dynamic website content management, Cloudinary asset pipeline, and section component registry.
+- [x] **Dynamic Website CMS Module (55 Tables Total)**:
+  - 11 Dynamic CMS tables added to `database/02_CreateTables.sql` (`WebsiteSettings`, `SEOSettings`, `WebsitePages`, `WebsitePageSections`, `WebsiteBanners`, `NavigationMenus`, `FooterSections`, `FAQs`, `Testimonials`, `SocialMediaLinks`, `ContactMessages`).
+  - Referential foreign keys appended to `database/03_CreateRelationships.sql`.
+  - Filtered and non-clustered performance indexes appended to `database/04_CreateIndexes.sql`.
+  - Cloudinary asset metadata attributes (`Url` + `PublicId`) supported across all CMS media entities.
+  - Development seed data appended to `database/05_SeedData.sql` for homepage banners, navigation, sections, FAQs, testimonials, and footer.
 
 ---
 

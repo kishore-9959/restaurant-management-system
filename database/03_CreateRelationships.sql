@@ -472,6 +472,94 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_AuditLogs_Users')
         FOREIGN KEY (UserId) REFERENCES dbo.Users(UserId) ON DELETE SET NULL;
 GO
 
-PRINT 'All Foreign Key constraints and referential integrity rules established successfully.';
+-- ============================================================================
+-- 11. WEBSITE CMS & DIGITAL PRESENCE RELATIONSHIPS
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsiteSettings_Restaurants')
+    ALTER TABLE dbo.WebsiteSettings ADD CONSTRAINT FK_WebsiteSettings_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsiteSettings_Branches')
+    ALTER TABLE dbo.WebsiteSettings ADD CONSTRAINT FK_WebsiteSettings_Branches
+        FOREIGN KEY (BranchId) REFERENCES dbo.Branches(BranchId) ON DELETE NO ACTION;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsitePages_Restaurants')
+    ALTER TABLE dbo.WebsitePages ADD CONSTRAINT FK_WebsitePages_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsitePages_Branches')
+    ALTER TABLE dbo.WebsitePages ADD CONSTRAINT FK_WebsitePages_Branches
+        FOREIGN KEY (BranchId) REFERENCES dbo.Branches(BranchId) ON DELETE NO ACTION;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SEOSettings_Restaurants')
+    ALTER TABLE dbo.SEOSettings ADD CONSTRAINT FK_SEOSettings_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SEOSettings_WebsitePages')
+    ALTER TABLE dbo.SEOSettings ADD CONSTRAINT FK_SEOSettings_WebsitePages
+        FOREIGN KEY (PageId) REFERENCES dbo.WebsitePages(PageId) ON DELETE NO ACTION;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsitePageSections_WebsitePages')
+    ALTER TABLE dbo.WebsitePageSections ADD CONSTRAINT FK_WebsitePageSections_WebsitePages
+        FOREIGN KEY (PageId) REFERENCES dbo.WebsitePages(PageId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsiteBanners_Restaurants')
+    ALTER TABLE dbo.WebsiteBanners ADD CONSTRAINT FK_WebsiteBanners_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_WebsiteBanners_Branches')
+    ALTER TABLE dbo.WebsiteBanners ADD CONSTRAINT FK_WebsiteBanners_Branches
+        FOREIGN KEY (BranchId) REFERENCES dbo.Branches(BranchId) ON DELETE NO ACTION;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_NavigationMenus_Restaurants')
+    ALTER TABLE dbo.NavigationMenus ADD CONSTRAINT FK_NavigationMenus_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_NavigationMenus_Parent')
+    ALTER TABLE dbo.NavigationMenus ADD CONSTRAINT FK_NavigationMenus_Parent
+        FOREIGN KEY (ParentMenuId) REFERENCES dbo.NavigationMenus(MenuId) ON DELETE NO ACTION;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FooterSections_Restaurants')
+    ALTER TABLE dbo.FooterSections ADD CONSTRAINT FK_FooterSections_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FAQs_Restaurants')
+    ALTER TABLE dbo.FAQs ADD CONSTRAINT FK_FAQs_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_Testimonials_Restaurants')
+    ALTER TABLE dbo.Testimonials ADD CONSTRAINT FK_Testimonials_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_SocialMediaLinks_Restaurants')
+    ALTER TABLE dbo.SocialMediaLinks ADD CONSTRAINT FK_SocialMediaLinks_Restaurants
+        FOREIGN KEY (RestaurantId) REFERENCES dbo.Restaurants(RestaurantId) ON DELETE CASCADE;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ContactMessages_Branches')
+    ALTER TABLE dbo.ContactMessages ADD CONSTRAINT FK_ContactMessages_Branches
+        FOREIGN KEY (BranchId) REFERENCES dbo.Branches(BranchId) ON DELETE SET NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ContactMessages_Users_RepliedBy')
+    ALTER TABLE dbo.ContactMessages ADD CONSTRAINT FK_ContactMessages_Users_RepliedBy
+        FOREIGN KEY (RepliedByUserId) REFERENCES dbo.Users(UserId) ON DELETE NO ACTION;
+GO
+
+PRINT 'All Foreign Key constraints and referential integrity rules established successfully across Core and CMS modules.';
 GO
 

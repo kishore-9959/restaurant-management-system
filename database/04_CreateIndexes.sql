@@ -259,5 +259,90 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_AuditLogs_Entity_Date'
     INCLUDE (UserId, ActionType, ActionDescription);
 GO
 
-PRINT 'All performance indexes and filtered indexes generated successfully.';
+-- ============================================================================
+-- 9. WEBSITE CMS & DIGITAL PRESENCE INDEXES
+-- ============================================================================
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_WebsiteSettings_Restaurant_Branch')
+    CREATE NONCLUSTERED INDEX IX_WebsiteSettings_Restaurant_Branch
+    ON dbo.WebsiteSettings(RestaurantId, BranchId)
+    INCLUDE (SiteTitle, HeaderLogoUrl, PrimaryColor, ContactPhone);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_WebsitePages_Slug')
+    CREATE NONCLUSTERED INDEX IX_WebsitePages_Slug
+    ON dbo.WebsitePages(PageSlug)
+    INCLUDE (PageId, PageTitle, PageType, Status, HeroBannerTitle, HeroImageUrl)
+    WHERE IsDeleted = 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_WebsitePages_Status_Display')
+    CREATE NONCLUSTERED INDEX IX_WebsitePages_Status_Display
+    ON dbo.WebsitePages(Status, DisplayOrder)
+    INCLUDE (PageId, PageTitle, PageSlug, PageType)
+    WHERE IsDeleted = 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_WebsitePageSections_Page_Display')
+    CREATE NONCLUSTERED INDEX IX_WebsitePageSections_Page_Display
+    ON dbo.WebsitePageSections(PageId, DisplayOrder)
+    INCLUDE (SectionId, SectionKey, SectionTitle, ComponentType, BackgroundType, BackgroundImageUrl)
+    WHERE IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_WebsiteBanners_Location_Display')
+    CREATE NONCLUSTERED INDEX IX_WebsiteBanners_Location_Display
+    ON dbo.WebsiteBanners(BannerLocation, DisplayOrder)
+    INCLUDE (BannerId, BannerTitle, Subtitle, ButtonText, ButtonLink, ImageUrl, MobileImageUrl)
+    WHERE IsDeleted = 0 AND IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_NavigationMenus_Location_Display')
+    CREATE NONCLUSTERED INDEX IX_NavigationMenus_Location_Display
+    ON dbo.NavigationMenus(MenuLocation, DisplayOrder)
+    INCLUDE (MenuId, ParentMenuId, Title, TargetUrl, OpenInNewTab, IconName)
+    WHERE IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FooterSections_Display')
+    CREATE NONCLUSTERED INDEX IX_FooterSections_Display
+    ON dbo.FooterSections(RestaurantId, DisplayOrder)
+    INCLUDE (FooterSectionId, SectionTitle, ContentType)
+    WHERE IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_FAQs_Category_Display')
+    CREATE NONCLUSTERED INDEX IX_FAQs_Category_Display
+    ON dbo.FAQs(Category, DisplayOrder)
+    INCLUDE (FAQId, Question, Answer)
+    WHERE IsDeleted = 0 AND IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Testimonials_Featured_Display')
+    CREATE NONCLUSTERED INDEX IX_Testimonials_Featured_Display
+    ON dbo.Testimonials(IsFeatured, DisplayOrder)
+    INCLUDE (TestimonialId, AuthorName, AuthorRole, Rating, ReviewContent, AuthorAvatarUrl)
+    WHERE IsDeleted = 0 AND IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SocialMediaLinks_Display')
+    CREATE NONCLUSTERED INDEX IX_SocialMediaLinks_Display
+    ON dbo.SocialMediaLinks(RestaurantId, DisplayOrder)
+    INCLUDE (SocialLinkId, PlatformName, PlatformUrl, IconKey)
+    WHERE IsActive = 1;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ContactMessages_Status_Date')
+    CREATE NONCLUSTERED INDEX IX_ContactMessages_Status_Date
+    ON dbo.ContactMessages(Status, CreatedAt DESC)
+    INCLUDE (MessageId, SenderName, SenderEmail, SenderPhone, Subject, InquiryType)
+    WHERE IsDeleted = 0;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SEOSettings_PageId')
+    CREATE NONCLUSTERED INDEX IX_SEOSettings_PageId
+    ON dbo.SEOSettings(PageId)
+    INCLUDE (SEOId, MetaTitle, MetaDescription, OgImageUrl);
+GO
+
+PRINT 'All performance indexes and filtered indexes generated successfully across Core and CMS modules.';
 GO

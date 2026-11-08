@@ -942,6 +942,272 @@ BEGIN
 END;
 GO
 
-PRINT 'All 44 database tables created successfully with strict data types, primary keys, and defaults.';
+PRINT 'Core 44 database tables verified successfully.';
+GO
+
+-- ============================================================================
+-- MODULE 25: WEBSITE CMS & DIGITAL PRESENCE (DYNAMIC CONTENT MANAGEMENT)
+-- ============================================================================
+
+IF OBJECT_ID('dbo.WebsiteSettings', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.WebsiteSettings (
+        SettingId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        BranchId INT NULL, -- NULL indicates global defaults; BranchId overrides for local branch landing
+        SiteTitle NVARCHAR(150) NOT NULL,
+        Tagline NVARCHAR(255) NULL,
+        HeaderLogoUrl NVARCHAR(500) NULL,
+        HeaderLogoPublicId NVARCHAR(150) NULL, -- Cloudinary asset ID
+        FooterLogoUrl NVARCHAR(500) NULL,
+        FooterLogoPublicId NVARCHAR(150) NULL,
+        FaviconUrl NVARCHAR(500) NULL,
+        PrimaryColor NVARCHAR(20) NOT NULL DEFAULT '#E63946',
+        SecondaryColor NVARCHAR(20) NOT NULL DEFAULT '#1D3557',
+        AccentColor NVARCHAR(20) NOT NULL DEFAULT '#F1FAEE',
+        FontFamily NVARCHAR(80) NOT NULL DEFAULT 'Inter, sans-serif',
+        ContactEmail NVARCHAR(120) NOT NULL,
+        ContactPhone NVARCHAR(25) NOT NULL,
+        WhatsappNumber NVARCHAR(25) NULL,
+        AddressLine NVARCHAR(255) NOT NULL,
+        GoogleMapsEmbedUrl NVARCHAR(1000) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_WebsiteSettings PRIMARY KEY CLUSTERED (SettingId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.WebsitePages', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.WebsitePages (
+        PageId BIGINT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        BranchId INT NULL,
+        PageTitle NVARCHAR(150) NOT NULL,
+        PageSlug NVARCHAR(150) NOT NULL, -- e.g. 'home', 'about-us', 'private-dining'
+        PageType NVARCHAR(50) NOT NULL DEFAULT 'CUSTOM', -- 'HOME', 'ABOUT', 'SERVICES', 'CONTACT', 'CUSTOM'
+        HeroBannerTitle NVARCHAR(200) NULL,
+        HeroBannerSubtitle NVARCHAR(500) NULL,
+        HeroImageUrl NVARCHAR(500) NULL,
+        HeroImagePublicId NVARCHAR(150) NULL,
+        ContentHtml NVARCHAR(MAX) NULL,
+        Status NVARCHAR(20) NOT NULL DEFAULT 'DRAFT', -- 'DRAFT', 'PUBLISHED', 'ARCHIVED'
+        PublishedAt DATETIME2(3) NULL,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsSystemPage BIT NOT NULL DEFAULT 0, -- Prevents accidental deletion of essential pages
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        IsDeleted BIT NOT NULL DEFAULT 0,
+        DeletedAt DATETIME2(3) NULL,
+        CONSTRAINT PK_WebsitePages PRIMARY KEY CLUSTERED (PageId),
+        CONSTRAINT UQ_WebsitePages_Slug UNIQUE (PageSlug)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.SEOSettings', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.SEOSettings (
+        SEOId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        PageId BIGINT NULL, -- NULL represents global site-wide fallback metadata
+        MetaTitle NVARCHAR(150) NOT NULL,
+        MetaDescription NVARCHAR(500) NOT NULL,
+        MetaKeywords NVARCHAR(500) NULL,
+        CanonicalUrl NVARCHAR(500) NULL,
+        OgTitle NVARCHAR(150) NULL,
+        OgDescription NVARCHAR(500) NULL,
+        OgImageUrl NVARCHAR(500) NULL,
+        OgImagePublicId NVARCHAR(150) NULL,
+        TwitterCardType NVARCHAR(30) NOT NULL DEFAULT 'summary_large_image',
+        StructuredDataJson NVARCHAR(MAX) NULL, -- Schema.org Restaurant JSON-LD
+        GoogleAnalyticsId NVARCHAR(50) NULL,
+        GoogleTagManagerId NVARCHAR(50) NULL,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_SEOSettings PRIMARY KEY CLUSTERED (SEOId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.WebsitePageSections', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.WebsitePageSections (
+        SectionId BIGINT IDENTITY(1,1) NOT NULL,
+        PageId BIGINT NOT NULL,
+        SectionKey NVARCHAR(80) NOT NULL, -- 'home_hero', 'home_about', 'home_featured'
+        SectionTitle NVARCHAR(150) NULL,
+        SectionSubtitle NVARCHAR(255) NULL,
+        ComponentType NVARCHAR(50) NOT NULL, -- 'HERO_SLIDER', 'ABOUT_STORY', 'FEATURED_MENU', 'CHEF_FEATURE', 'SERVICES_LIST', 'STATS_COUNTER', 'TESTIMONIALS_GRID', 'FAQ_ACCORDION', 'RESERVATION_CTA', 'NEWSLETTER_FORM', 'MAP_CONTACT', 'CUSTOM_HTML'
+        ContentDataJson NVARCHAR(MAX) NULL, -- Flexible section parameters
+        BackgroundType NVARCHAR(30) NOT NULL DEFAULT 'COLOR', -- 'COLOR', 'IMAGE', 'VIDEO'
+        BackgroundColor NVARCHAR(30) NULL,
+        BackgroundImageUrl NVARCHAR(500) NULL,
+        BackgroundImagePublicId NVARCHAR(150) NULL,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_WebsitePageSections PRIMARY KEY CLUSTERED (SectionId),
+        CONSTRAINT UQ_WebsitePageSections_Page_Key UNIQUE (PageId, SectionKey)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.WebsiteBanners', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.WebsiteBanners (
+        BannerId BIGINT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        BranchId INT NULL,
+        BannerTitle NVARCHAR(150) NOT NULL,
+        Subtitle NVARCHAR(300) NULL,
+        BadgeText NVARCHAR(60) NULL, -- 'Seasonal Special', 'Chef Choice'
+        ButtonText NVARCHAR(60) NULL,
+        ButtonLink NVARCHAR(255) NULL,
+        SecondaryButtonText NVARCHAR(60) NULL,
+        SecondaryButtonLink NVARCHAR(255) NULL,
+        ImageUrl NVARCHAR(500) NOT NULL,
+        ImagePublicId NVARCHAR(150) NULL,
+        MobileImageUrl NVARCHAR(500) NULL,
+        MobileImagePublicId NVARCHAR(150) NULL,
+        BannerLocation NVARCHAR(50) NOT NULL DEFAULT 'HOME_HERO', -- 'HOME_HERO', 'MENU_HEADER', 'PROMO_BAR', 'POPUP'
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        StartDate DATETIME2(3) NULL,
+        EndDate DATETIME2(3) NULL,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        IsDeleted BIT NOT NULL DEFAULT 0,
+        DeletedAt DATETIME2(3) NULL,
+        CONSTRAINT PK_WebsiteBanners PRIMARY KEY CLUSTERED (BannerId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.NavigationMenus', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.NavigationMenus (
+        MenuId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        ParentMenuId INT NULL, -- Self-referencing dropdown menus
+        MenuLocation NVARCHAR(40) NOT NULL DEFAULT 'HEADER', -- 'HEADER', 'HEADER_QUICK', 'FOOTER_EXPLORE', 'MOBILE_DRAWER'
+        Title NVARCHAR(80) NOT NULL,
+        TargetUrl NVARCHAR(255) NOT NULL,
+        OpenInNewTab BIT NOT NULL DEFAULT 0,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        IconName NVARCHAR(50) NULL,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_NavigationMenus PRIMARY KEY CLUSTERED (MenuId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.FooterSections', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.FooterSections (
+        FooterSectionId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        SectionTitle NVARCHAR(80) NOT NULL,
+        ContentType NVARCHAR(40) NOT NULL DEFAULT 'LINKS', -- 'LINKS', 'RICH_TEXT', 'HOURS', 'NEWSLETTER'
+        ContentHtml NVARCHAR(MAX) NULL,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_FooterSections PRIMARY KEY CLUSTERED (FooterSectionId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.FAQs', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.FAQs (
+        FAQId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        Category NVARCHAR(60) NOT NULL DEFAULT 'GENERAL', -- 'RESERVATIONS', 'DELIVERY', 'DIETARY', 'EVENTS'
+        Question NVARCHAR(300) NOT NULL,
+        Answer NVARCHAR(MAX) NOT NULL,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        IsDeleted BIT NOT NULL DEFAULT 0,
+        DeletedAt DATETIME2(3) NULL,
+        CONSTRAINT PK_FAQs PRIMARY KEY CLUSTERED (FAQId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.Testimonials', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Testimonials (
+        TestimonialId BIGINT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        AuthorName NVARCHAR(100) NOT NULL,
+        AuthorRole NVARCHAR(80) NULL, -- 'Food Critic, Times', 'Verified Diner'
+        AuthorAvatarUrl NVARCHAR(500) NULL,
+        AuthorAvatarPublicId NVARCHAR(150) NULL,
+        Rating INT NOT NULL DEFAULT 5,
+        ReviewContent NVARCHAR(1000) NOT NULL,
+        SourcePlatform NVARCHAR(50) NULL, -- 'GOOGLE', 'TRIPADVISOR', 'PRESS'
+        IsFeatured BIT NOT NULL DEFAULT 1,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        IsDeleted BIT NOT NULL DEFAULT 0,
+        DeletedAt DATETIME2(3) NULL,
+        CONSTRAINT PK_Testimonials PRIMARY KEY CLUSTERED (TestimonialId),
+        CONSTRAINT CK_Testimonials_Rating CHECK (Rating BETWEEN 1 AND 5)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.SocialMediaLinks', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.SocialMediaLinks (
+        SocialLinkId INT IDENTITY(1,1) NOT NULL,
+        RestaurantId INT NOT NULL,
+        PlatformName NVARCHAR(50) NOT NULL, -- 'INSTAGRAM', 'FACEBOOK', 'TWITTER_X', 'YOUTUBE', 'TRIPADVISOR'
+        PlatformUrl NVARCHAR(500) NOT NULL,
+        IconKey NVARCHAR(50) NOT NULL,
+        DisplayOrder INT NOT NULL DEFAULT 0,
+        IsActive BIT NOT NULL DEFAULT 1,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        UpdatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_SocialMediaLinks PRIMARY KEY CLUSTERED (SocialLinkId)
+    );
+END;
+GO
+
+IF OBJECT_ID('dbo.ContactMessages', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ContactMessages (
+        MessageId BIGINT IDENTITY(1,1) NOT NULL,
+        BranchId INT NULL,
+        SenderName NVARCHAR(100) NOT NULL,
+        SenderEmail NVARCHAR(120) NOT NULL,
+        SenderPhone NVARCHAR(25) NULL,
+        Subject NVARCHAR(150) NOT NULL,
+        InquiryType NVARCHAR(50) NOT NULL DEFAULT 'GENERAL', -- 'GENERAL', 'PRIVATE_EVENT', 'FEEDBACK', 'CATERING'
+        MessageBody NVARCHAR(2000) NOT NULL,
+        Status NVARCHAR(30) NOT NULL DEFAULT 'UNREAD', -- 'UNREAD', 'READ', 'REPLIED', 'ARCHIVED'
+        AdminReplyNotes NVARCHAR(1000) NULL,
+        RepliedByUserId BIGINT NULL,
+        RepliedAt DATETIME2(3) NULL,
+        CreatedAt DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        IsDeleted BIT NOT NULL DEFAULT 0,
+        DeletedAt DATETIME2(3) NULL,
+        CONSTRAINT PK_ContactMessages PRIMARY KEY CLUSTERED (MessageId)
+    );
+END;
+GO
+
+PRINT 'All 55 database tables (44 Core + 11 Dynamic CMS) created successfully with strict data types, primary keys, and defaults.';
 GO
 
