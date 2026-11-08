@@ -1,0 +1,42 @@
+{
+  "name": "restaurant-management-system",
+  "version": "1.0.0",
+  "description": "Enterprise Restaurant Management System (RMS) - Pure Microservices Architecture",
+  "private": true,
+  "workspaces": [
+    "backend/*"
+  ],
+  "scripts": {
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "install:all": "npm install --workspaces",
+    "dev:gateway": "node --watch backend/api-gateway/src/index.js",
+    "dev:auth": "node --watch backend/auth-service/src/index.js",
+    "dev:user": "node --watch backend/user-service/src/index.js",
+    "dev:restaurant": "node --watch backend/restaurant-service/src/index.js",
+    "dev:cms": "node --watch backend/cms-service/src/index.js",
+    "dev:menu": "node --watch backend/menu-service/src/index.js",
+    "dev:cart": "node --watch backend/cart-service/src/index.js",
+    "dev:order": "node --watch backend/order-service/src/index.js",
+    "dev:payment": "node --watch backend/payment-service/src/index.js",
+    "dev:inventory": "node --watch backend/inventory-service/src/index.js",
+    "dev:kitchen": "node --watch backend/kitchen-service/src/index.js",
+    "dev:reservation": "node --watch backend/reservation-service/src/index.js",
+    "dev:notification": "node --watch backend/notification-service/src/index.js",
+    "dev:report": "node --watch backend/report-service/src/index.js"
+  },
+  "keywords": [
+    "restaurant-management",
+    "microservices",
+    "sql-server",
+    "redis",
+    "socket-io",
+    "express",
+    "nodejs"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "ISC"
+}
+

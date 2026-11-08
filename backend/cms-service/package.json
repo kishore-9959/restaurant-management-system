@@ -1,0 +1,24 @@
+{
+  "name": "rms-cms-service",
+  "version": "1.0.0",
+  "description": "Dynamic CMS, website branding, banners, pages, and SEO service for RMS",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "cloudinary": "^2.5.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.4.2",
+    "multer": "^1.4.5-lts.1",
+    "sequelize": "^6.37.5",
+    "tedious": "^18.6.1",
+    "uuid": "^11.0.5",
+    "winston": "^3.17.0"
+  }
+}
+

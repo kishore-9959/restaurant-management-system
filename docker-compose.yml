@@ -1,0 +1,360 @@
+# ============================================================================
+# RESTAURANT MANAGEMENT SYSTEM (RMS) - MASTER DOCKER COMPOSE CONFIGURATION
+# File: docker-compose.yml
+# Description: Pure microservices composition consisting of 14 independent Node.js
+#              services, 1 shared MSSQL database, 1 shared Redis cache, and Nginx.
+# All services read from the single root .env file.
+# ============================================================================
+
+version: '3.8'
+
+networks:
+  rms-network:
+    driver: bridge
+
+volumes:
+  mssql_data:
+  redis_data:
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. SHARED DATA TIER (MSSQL & REDIS)
+  # ----------------------------------------------------------------------------
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rms-mssql
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:-YourStrong!Passw0rd}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    networks:
+      - rms-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${DB_PASSWORD:-YourStrong!Passw0rd} -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  redis:
+    image: redis:7-alpine
+    container_name: rms-redis
+    restart: always
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - rms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # 2. INGRESS & EDGE TIER (NGINX & API GATEWAY)
+  # ----------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: rms-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-gateway
+      - notification-service
+    networks:
+      - rms-network
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./backend/api-gateway/Dockerfile
+    container_name: rms-api-gateway
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_AUTH_SERVICE=http://auth-service:5001
+      - URL_USER_SERVICE=http://user-service:5002
+      - URL_RESTAURANT_SERVICE=http://restaurant-service:5003
+      - URL_CMS_SERVICE=http://cms-service:5004
+      - URL_MENU_SERVICE=http://menu-service:5005
+      - URL_CART_SERVICE=http://cart-service:5006
+      - URL_ORDER_SERVICE=http://order-service:5007
+      - URL_PAYMENT_SERVICE=http://payment-service:5008
+      - URL_INVENTORY_SERVICE=http://inventory-service:5009
+      - URL_KITCHEN_SERVICE=http://kitchen-service:5010
+      - URL_RESERVATION_SERVICE=http://reservation-service:5011
+      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+      - URL_REPORT_SERVICE=http://report-service:5013
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+      - mssql
+    networks:
+      - rms-network
+
+  # ----------------------------------------------------------------------------
+  # 3. CORE DOMAIN MICROSERVICES (13 SERVICES)
+  # ----------------------------------------------------------------------------
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./backend/auth-service/Dockerfile
+    container_name: rms-auth-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5001:5001"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  user-service:
+    build:
+      context: .
+      dockerfile: ./backend/user-service/Dockerfile
+    container_name: rms-user-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5002:5002"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  restaurant-service:
+    build:
+      context: .
+      dockerfile: ./backend/restaurant-service/Dockerfile
+    container_name: rms-restaurant-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5003:5003"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  cms-service:
+    build:
+      context: .
+      dockerfile: ./backend/cms-service/Dockerfile
+    container_name: rms-cms-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5004:5004"
+    depends_on:
+      - mssql
+      - redis
+    networks:
+      - rms-network
+
+  menu-service:
+    build:
+      context: .
+      dockerfile: ./backend/menu-service/Dockerfile
+    container_name: rms-menu-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5005:5005"
+    depends_on:
+      - mssql
+      - redis
+    networks:
+      - rms-network
+
+  cart-service:
+    build:
+      context: .
+      dockerfile: ./backend/cart-service/Dockerfile
+    container_name: rms-cart-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_MENU_SERVICE=http://menu-service:5005
+    ports:
+      - "5006:5006"
+    depends_on:
+      - mssql
+      - redis
+    networks:
+      - rms-network
+
+  order-service:
+    build:
+      context: .
+      dockerfile: ./backend/order-service/Dockerfile
+    container_name: rms-order-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_MENU_SERVICE=http://menu-service:5005
+      - URL_INVENTORY_SERVICE=http://inventory-service:5009
+      - URL_KITCHEN_SERVICE=http://kitchen-service:5010
+      - URL_PAYMENT_SERVICE=http://payment-service:5008
+      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+    ports:
+      - "5007:5007"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: ./backend/payment-service/Dockerfile
+    container_name: rms-payment-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_ORDER_SERVICE=http://order-service:5007
+      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+    ports:
+      - "5008:5008"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  inventory-service:
+    build:
+      context: .
+      dockerfile: ./backend/inventory-service/Dockerfile
+    container_name: rms-inventory-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5009:5009"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  kitchen-service:
+    build:
+      context: .
+      dockerfile: ./backend/kitchen-service/Dockerfile
+    container_name: rms-kitchen-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+    ports:
+      - "5010:5010"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  reservation-service:
+    build:
+      context: .
+      dockerfile: ./backend/reservation-service/Dockerfile
+    container_name: rms-reservation-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+      - URL_RESTAURANT_SERVICE=http://restaurant-service:5003
+      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+    ports:
+      - "5011:5011"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: ./backend/notification-service/Dockerfile
+    container_name: rms-notification-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mssql
+      - REDIS_HOST=redis
+    ports:
+      - "5012:5012"
+    depends_on:
+      - mssql
+    networks:
+      - rms-network
+
+  report-service:
+    build:
+      context: .
+      dockerfile: ./backend/report-service/Dockerfile
+    container_name: rms-report-service
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - URL_ORDER_SERVICE=http://order-service:5007
+      - URL_PAYMENT_SERVICE=http://payment-service:5008
+      - URL_INVENTORY_SERVICE=http://inventory-service:5009
+    ports:
+      - "5013:5013"
+    networks:
+      - rms-network
+

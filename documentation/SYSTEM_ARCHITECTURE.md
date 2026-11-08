@@ -1,92 +1,118 @@
 # Restaurant Management System (RMS)
-## Enterprise System Architecture & Technical Specifications
+## Enterprise Microservices System Architecture & Technical Specifications
 
 ---
 
 ### 1. High-Level Architectural Topology
 
-The Restaurant Management System is architectured as a **Structured Modular Monolith** optimized for enterprise stability, immediate cross-domain transactional consistency, and low-latency real-time synchronization.
+The Restaurant Management System is architectured as an **Enterprise Microservices Architecture** consisting of **14 independently deployable, loosely coupled microservices** coordinated via an **API Gateway**, communicating through resilient **HTTP REST APIs**, and persisting state to a single shared Microsoft SQL Server database (`RestaurantManagementDB`) governed by strict table ownership boundaries.
 
 ```mermaid
 flowchart TB
     subgraph ClientTiers["Client Applications (React.js + Ant Design)"]
         direction LR
-        CUST["Customer Web Portal\n(Mobile-First Responsive)"]
-        POS["POS & Floor Terminal\n(Tablet / Touch Desktop)"]
-        KDS["Kitchen Display System\n(Wall / Station Monitor)"]
-        ADMIN["Admin Intelligence Suite\n(Desktop Console)"]
+        CUST["Customer Web Portal\n(:3000)"]
+        ADMIN["Admin Management Suite\n(:3001)"]
+        KDS["Kitchen Display (KDS)\n(:3002)"]
+        POS["Staff / POS Terminal\n(:3003)"]
     end
 
-    subgraph Edge["Security & Gateway Perimeter"]
+    subgraph GatewayPerimeter["Ingress & Edge Perimeter"]
         direction TB
-        HELMET["Security Headers (Helmet)"]
-        CORS_CFG["Strict CORS Whitelist"]
-        RATE_LIMIT["Rate Limiter (Express-Rate-Limit)"]
-        BODY_PARSER["Body Parser & JSON Sanitizer"]
+        NGINX["Nginx Reverse Proxy & SSL Termination\n(:80 / :443)"]
+        GATEWAY["API Gateway Service (:5000)\n• JWT Verification & RBAC Guards\n• Rate Limiting (Redis Store)\n• Request Correlation IDs (X-Correlation-ID)\n• Reverse Proxy Routing"]
     end
 
-    subgraph CoreBackend["Application Core (Node.js + Express.js)"]
+    subgraph ServiceMesh["Microservices Domain Mesh (HTTP REST Inter-Service Fabric)"]
         direction TB
-        AUTH_MW["JWT & RBAC Middleware"]
-        VALID_MW["Request Validation (Zod Schemas)"]
-        
-        subgraph Domains["Business Domain Modules"]
-            direction TB
-            D_AUTH["Identity & RBAC Module"]
-            D_MENU["Menu Engineering Module"]
-            D_TABLE["Floor & Reservation Module"]
-            D_ORDER["Order & Billing Lifecycle Module"]
-            D_KDS["KDS & Ticket Routing Module"]
-            D_INV["Inventory & Recipe (BOM) Module"]
-            D_PAY["Razorpay Payment Module"]
-            D_REP["Reporting & Analytics Module"]
-        end
-
-        subgraph Sockets["Real-Time Engine"]
-            SIO["Socket.IO Server v4"]
-            ROOMS["Rooms Engine\n(Kitchen, POS, Tables, Orders)"]
-        end
+        AUTH_SVC["Auth Service (:5001)"]
+        USER_SVC["User Service (:5002)"]
+        REST_SVC["Restaurant Service (:5003)"]
+        CMS_SVC["CMS Service (:5004)"]
+        MENU_SVC["Menu Service (:5005)"]
+        CART_SVC["Cart Service (:5006)"]
+        ORDER_SVC["Order Service (:5007)"]
+        PAY_SVC["Payment Service (:5008)"]
+        INV_SVC["Inventory Service (:5009)"]
+        KITCHEN_SVC["Kitchen Service (:5010)"]
+        RES_SVC["Reservation Service (:5011)"]
+        NOTIF_SVC["Notification Service (:5012 / Socket.IO)"]
+        REP_SVC["Report Service (:5013)"]
     end
 
-    subgraph Persistence["Persistence & Integration Layer"]
-        ORM["Sequelize ORM v6\n(Tedious Driver + Connection Pool)"]
-        MSSQL[("Microsoft SQL Server 2022\n(ACID Relational Engine)")]
+    subgraph Persistence["Persistence & State Layer"]
+        MSSQL[("Microsoft SQL Server 2022\n'RestaurantManagementDB' (:1433)\n(55 Tables with Strict Service Ownership)")]
+        REDIS[("Redis Cache & Rate Limiting (:6379)\n(CMS, Menu, Sessions & Buckets)")]
         RZP_EXT["Razorpay Gateway API\n(Payments & Webhooks)"]
+        CLOUDINARY["Cloudinary Media CDN\n(Asset Transforms)"]
     end
 
-    ClientTiers --> Edge
-    Edge --> AUTH_MW --> VALID_MW --> Domains
-    ClientTiers <-->|WebSockets WSS| SIO
-    SIO --- ROOMS
-    Domains --> ORM
-    ORM --> MSSQL
-    D_PAY <--> RZP_EXT
-    Domains -.->|Trigger Events| SIO
+    ClientTiers --> NGINX --> GATEWAY
+    ClientTiers <-->|WebSockets WSS| NOTIF_SVC
+
+    GATEWAY --> AUTH_SVC & USER_SVC & REST_SVC & CMS_SVC & MENU_SVC & CART_SVC & ORDER_SVC & PAY_SVC & INV_SVC & KITCHEN_SVC & RES_SVC & NOTIF_SVC & REP_SVC
+
+    ORDER_SVC <-->|HTTP REST Saga| MENU_SVC & INV_SVC & KITCHEN_SVC & PAY_SVC & NOTIF_SVC
+    CART_SVC <-->|HTTP REST| MENU_SVC
+    PAY_SVC <-->|HTTP REST| ORDER_SVC & NOTIF_SVC
+    RES_SVC <-->|HTTP REST| REST_SVC & NOTIF_SVC
+    REP_SVC <-->|HTTP REST| ORDER_SVC & PAY_SVC & INV_SVC
+
+    PAY_SVC <--> RZP_EXT
+    CMS_SVC <--> CLOUDINARY
+
+    CMS_SVC & MENU_SVC & CART_SVC & GATEWAY <--> REDIS
+    ServiceMesh -->|Sequelize ORM\n(Owns Assigned Tables Only)| MSSQL
 ```
 
-#### Why a Modular Monolith?
-1. **MSSQL Transaction Atomicity**: In food service operations, reserving a table, committing an order, generating a bill, and deducting inventory from recipe BOM must occur inside a single distributed transaction boundary. A modular monolith allows zero-overhead Sequelize transactions (`READ COMMITTED`) without complex two-phase commits (2PC) or eventual-consistency saga failures.
-2. **Unified Real-Time Event Bus**: Socket.IO runs in-process with direct access to database commit events, ensuring microsecond dispatch of KOTs directly to kitchen stations.
-3. **Operational Simplicity & Deployment**: Single deployment artifact for backend services, reducing infrastructure complexity while maintaining strict domain separation at code level.
+#### Core Microservices Principles
+1. **Independent Service Boundaries**: Every microservice maintains its own `package.json`, source directory, controllers, services, models, routes, validation schemas, and health-check endpoint.
+2. **Shared Database with Strict Table Ownership**: All services connect to the single enterprise database `RestaurantManagementDB`. Each table has exactly **one owner service**; no service may execute queries against tables owned by another service. Cross-service data is accessed strictly via documented HTTP REST endpoints.
+3. **HTTP REST Inter-Service Communication**: Zero message broker (no RabbitMQ, no Kafka, no gRPC). Services interact using Axios HTTP clients with correlation IDs (`X-Correlation-ID`), internal service keys (`X-Internal-Service-Key`), request timeouts, and retry policies.
+4. **Single Global Environment Configuration**: Configuration is centralized in a single root `.env` file (`restaurant-management-system/.env`). Individual services do not have local `.env` files.
+5. **Distributed Transaction Management (REST Saga)**: Multi-service workflows (such as order checkout, inventory depletion, payment verification, and KOT generation) are orchestrated through an HTTP-based Saga with compensating transactions and idempotency keys (`X-Idempotency-Key`).
+6. **Centralized Real-Time WebSocket Hub**: `Notification Service` is the sole Socket.IO server; domain services trigger live broadcasts via internal HTTP POST calls to `notification-service`.
 
 ---
 
-### 2. Clean Layered Backend Architecture
+### 2. Microservice Clean Layered Architecture
 
-Every domain module strictly follows clean separation of concerns:
+Each of the 14 microservices strictly follows an isolated clean layered architecture:
 
 ```
-[ HTTP / WebSocket Request ]
+[ Ingress HTTP Request via API Gateway / Inter-Service Call ]
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                   Route Layer                          │  --> Express Router (e.g. /api/v1/orders)
+└─────────────────────────┬──────────────────────────────┘
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│         Validation & Internal Auth Guard               │  --> Zod Schema Validation, Internal Key Check
+└─────────────────────────┬──────────────────────────────┘
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                Controller Layer                        │  --> Request DTO extraction, HTTP status codes,
+└─────────────────────────┬──────────────────────────────┘      standard response envelope formatting
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                 Service Layer                          │  --> Core business logic, inter-service REST
+└───────────┬──────────────────────────────┬─────────────┘      calls (Axios), Saga orchestration
+            │                              │
+            ▼                              ▼
+┌───────────────────────────┐  ┌─────────────────────────┐
+│     Sequelize Models      │  │  Inter-Service Client   │  --> HTTP REST calls to other microservices
+│  (Owned DB Tables Only)   │  │  (Axios + Correlation)  │      with timeouts & idempotency headers
+└───────────┬───────────────┘  └─────────────────────────┘
             │
             ▼
 ┌───────────────────────────┐
-│     Route Definitions     │  --> Express Router (e.g., /api/v1/orders)
-└───────────┬───────────────┘
-            │
-            ▼
-┌───────────────────────────┐
-│  Validation & Auth Guard  │  --> JWT Verification, RBAC Check, Zod Schema Validation
-└───────────┬───────────────┘
+│  MS SQL Server (Shared)   │  --> Executes queries only on service-owned tables
+└───────────────────────────┘
+```
             │
             ▼
 ┌───────────────────────────┐
