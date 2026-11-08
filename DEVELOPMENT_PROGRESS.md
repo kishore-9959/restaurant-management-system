@@ -50,6 +50,9 @@
     3. `sp_OpenCashRegisterShift` (Float tracking)
     4. `sp_CloseCashRegisterShift` (Float balancing & Z-report over/short calculation)
     5. `sp_CheckTableAvailability` (Reservation slot conflict prevention)
+    6. `sp_GetPublicPageWithSections` (High-speed single-roundtrip query for public website pages & banners)
+    7. `sp_ReorderPageSections` (Atomic drag-and-drop section reordering)
+    8. `sp_SubmitContactMessage` (Inbound guest contact inquiry + staff notification trigger)
 - [x] **Master Architectural Documentation**:
   - `documentation/DATABASE_DESIGN.md`: Complete Data Dictionary, 55-table inventory, and referential rules.
   - `documentation/ER_DIAGRAM.md`: Comprehensive domain ER diagrams rendered in Mermaid syntax.

@@ -504,6 +504,188 @@ BEGIN
 END;
 GO
 
-PRINT 'All mission-critical stored procedures compiled successfully.';
+-- ============================================================================
+-- PROCEDURE 6: sp_GetPublicPageWithSections
+-- Description: High-speed single-roundtrip query retrieving public page metadata,
+--              SEO OpenGraph tags, ordered active sections, and hero banners.
+-- ============================================================================
+CREATE OR ALTER PROCEDURE dbo.sp_GetPublicPageWithSections
+    @PageSlug NVARCHAR(150),
+    @PreviewMode BIT = 0 -- If 1, allows viewing DRAFT content (Admin JWT authorized)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @PageId BIGINT;
+
+    -- 1. Fetch Page Header & SEO Metadata
+    SELECT TOP 1
+        p.PageId,
+        p.RestaurantId,
+        p.BranchId,
+        p.PageTitle,
+        p.PageSlug,
+        p.PageType,
+        p.HeroBannerTitle,
+        p.HeroBannerSubtitle,
+        p.HeroImageUrl,
+        p.ContentHtml,
+        p.Status,
+        p.PublishedAt,
+        s.MetaTitle,
+        s.MetaDescription,
+        s.MetaKeywords,
+        s.CanonicalUrl,
+        s.OgTitle,
+        s.OgDescription,
+        s.OgImageUrl,
+        s.TwitterCardType,
+        s.StructuredDataJson
+    FROM dbo.WebsitePages p
+    LEFT JOIN dbo.SEOSettings s ON p.PageId = s.PageId
+    WHERE p.PageSlug = @PageSlug
+      AND p.IsDeleted = 0
+      AND (@PreviewMode = 1 OR p.Status = 'PUBLISHED');
+
+    SELECT @PageId = PageId 
+    FROM dbo.WebsitePages 
+    WHERE PageSlug = @PageSlug AND IsDeleted = 0;
+
+    IF @PageId IS NULL
+    BEGIN
+        RETURN;
+    END
+
+    -- 2. Fetch Ordered Page Sections
+    SELECT 
+        s.SectionId,
+        s.PageId,
+        s.SectionKey,
+        s.SectionTitle,
+        s.SectionSubtitle,
+        s.ComponentType,
+        s.ContentDataJson,
+        s.BackgroundType,
+        s.BackgroundColor,
+        s.BackgroundImageUrl,
+        s.DisplayOrder
+    FROM dbo.WebsitePageSections s
+    WHERE s.PageId = @PageId
+      AND s.IsActive = 1
+    ORDER BY s.DisplayOrder ASC;
+
+    -- 3. If Homepage, return active promotional banners
+    IF @PageSlug = 'home'
+    BEGIN
+        SELECT 
+            b.BannerId,
+            b.BannerTitle,
+            b.Subtitle,
+            b.BadgeText,
+            b.ButtonText,
+            b.ButtonLink,
+            b.SecondaryButtonText,
+            b.SecondaryButtonLink,
+            b.ImageUrl,
+            b.MobileImageUrl,
+            b.BannerLocation,
+            b.DisplayOrder
+        FROM dbo.WebsiteBanners b
+        WHERE b.IsActive = 1
+          AND b.IsDeleted = 0
+          AND (b.StartDate IS NULL OR b.StartDate <= SYSUTCDATETIME())
+          AND (b.EndDate IS NULL OR b.EndDate >= SYSUTCDATETIME())
+        ORDER BY b.DisplayOrder ASC;
+    END
+END;
+GO
+
+-- ============================================================================
+-- PROCEDURE 7: sp_ReorderPageSections
+-- Description: Batch updates display order of page sections via atomic transaction.
+--              Input: JSON array [{"sectionId": 10, "displayOrder": 1}, ...]
+-- ============================================================================
+CREATE OR ALTER PROCEDURE dbo.sp_ReorderPageSections
+    @PageId BIGINT,
+    @SectionsOrderJson NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        UPDATE s
+        SET s.DisplayOrder = j.NewOrder,
+            s.UpdatedAt = SYSUTCDATETIME()
+        FROM dbo.WebsitePageSections s
+        JOIN (
+            SELECT 
+                CAST(JSON_VALUE(value, '$.sectionId') AS BIGINT) AS SectionId,
+                CAST(JSON_VALUE(value, '$.displayOrder') AS INT) AS NewOrder
+            FROM OPENJSON(@SectionsOrderJson)
+        ) j ON s.SectionId = j.SectionId
+        WHERE s.PageId = @PageId;
+
+        COMMIT TRANSACTION;
+
+        SELECT 'SUCCESS' AS Status, 'Page sections reordered successfully.' AS Message;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        DECLARE @ErrorMessage NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrorMessage, 16, 1);
+    END CATCH
+END;
+GO
+
+-- ============================================================================
+-- PROCEDURE 8: sp_SubmitContactMessage
+-- Description: Inserts guest contact message & generates staff notification alert.
+-- ============================================================================
+CREATE OR ALTER PROCEDURE dbo.sp_SubmitContactMessage
+    @BranchId INT = NULL,
+    @SenderName NVARCHAR(100),
+    @SenderEmail NVARCHAR(120),
+    @SenderPhone NVARCHAR(25) = NULL,
+    @Subject NVARCHAR(150),
+    @InquiryType NVARCHAR(50) = 'GENERAL',
+    @MessageBody NVARCHAR(2000),
+    @NewMessageId BIGINT OUTPUT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO dbo.ContactMessages (
+        BranchId, SenderName, SenderEmail, SenderPhone,
+        Subject, InquiryType, MessageBody, Status, CreatedAt
+    ) VALUES (
+        @BranchId, @SenderName, @SenderEmail, @SenderPhone,
+        @Subject, @InquiryType, @MessageBody, 'UNREAD', SYSUTCDATETIME()
+    );
+
+    SET @NewMessageId = SCOPE_IDENTITY();
+
+    -- Generate In-App Admin Notification Alert
+    INSERT INTO dbo.Notifications (
+        BranchId, UserId, Title, Message, NotificationType, TargetUrl, IsRead, CreatedAt
+    ) VALUES (
+        @BranchId, NULL, 
+        N'New Guest Inquiry: ' + @Subject,
+        N'Message from ' + @SenderName + N' (' + @SenderEmail + N'): ' + LEFT(@MessageBody, 150),
+        'CONTACT_MESSAGE',
+        N'/admin/cms/messages/' + CAST(@NewMessageId AS NVARCHAR(20)),
+        0,
+        SYSUTCDATETIME()
+    );
+
+    SELECT @NewMessageId AS MessageId, 'UNREAD' AS Status, 'SUCCESS' AS ResultStatus;
+END;
+GO
+
+PRINT 'All mission-critical stored procedures (Core Operations + Dynamic CMS) compiled successfully.';
 GO
 
