@@ -9,7 +9,7 @@ WORKDIR /app/backend/menu-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5005
+EXPOSE 8005
 
 CMD ["npm", "start"]
 

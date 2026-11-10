@@ -11,7 +11,7 @@ WORKDIR /app/backend/api-gateway
 # Install production dependencies
 RUN npm install --omit=dev
 
-EXPOSE 5000
+EXPOSE 8000
 
 CMD ["npm", "start"]
 

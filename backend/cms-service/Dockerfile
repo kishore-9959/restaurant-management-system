@@ -9,7 +9,7 @@ WORKDIR /app/backend/cms-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5004
+EXPOSE 8004
 
 CMD ["npm", "start"]
 

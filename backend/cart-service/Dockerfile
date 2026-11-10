@@ -9,7 +9,7 @@ WORKDIR /app/backend/cart-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5006
+EXPOSE 8006
 
 CMD ["npm", "start"]
 

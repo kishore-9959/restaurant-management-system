@@ -93,7 +93,7 @@ In accordance with the project architectural decisions:
 
 ### 3. Service-by-Service Ownership & API Boundary Details
 
-#### 3.1 `restaurant-service` (Port 5003)
+#### 3.1 `restaurant-service` (Port 8003)
 - **Owned Tables**: `Restaurants`, `Branches`, `DiningSections`, `RestaurantTables`, `RegisterShifts`, `CustomerReviews` (6 tables).
 - **Data Responsibility**: Manages physical locations, dining layout, table state transitions, cash registers, and dining feedback.
 - **Exposed REST Endpoints**:
@@ -104,7 +104,7 @@ In accordance with the project architectural decisions:
   - `POST /api/v1/shifts/open`, `POST /api/v1/shifts/close`
   - `GET /api/v1/reviews/branch/:branchId`
 
-#### 3.2 `auth-service` (Port 5001)
+#### 3.2 `auth-service` (Port 8001)
 - **Owned Tables**: `Roles`, `Permissions`, `RolePermissions` (3 tables).
 - **Data Responsibility**: Security roles, permission hierarchies, token generation, credential verification.
 - **Exposed REST Endpoints**:
@@ -114,7 +114,7 @@ In accordance with the project architectural decisions:
   - `POST /api/v1/auth/refresh-token`
   - `POST /api/v1/auth/verify-token` (Used by API Gateway)
 
-#### 3.3 `user-service` (Port 5002)
+#### 3.3 `user-service` (Port 8002)
 - **Owned Tables**: `Users`, `UserRoles`, `Employees`, `CustomerAddresses`, `AuditLogs` (5 tables).
 - **Data Responsibility**: User master records, staff profiles, customer delivery addresses, system audit logging.
 - **Exposed REST Endpoints**:
@@ -123,14 +123,14 @@ In accordance with the project architectural decisions:
   - `GET /api/v1/employees/branch/:branchId`
   - `POST /api/v1/audit-logs` (Internal API for logging domain actions)
 
-#### 3.4 `cms-service` (Port 5004)
+#### 3.4 `cms-service` (Port 8004)
 - **Owned Tables**: `WebsiteSettings`, `SEOSettings`, `WebsitePages`, `WebsitePageSections`, `WebsiteBanners`, `NavigationMenus`, `FooterSections`, `FAQs`, `Testimonials`, `SocialMediaLinks`, `ContactMessages` (11 tables).
 - **Data Responsibility**: All dynamic customer-facing website content, branding, SEO tags, Cloudinary image upload signatures.
 - **Exposed REST Endpoints**:
   - Public: `GET /api/v1/cms/public/settings`, `GET /api/v1/cms/public/pages/:slug`, `GET /api/v1/cms/public/banners`, `POST /api/v1/cms/public/contact`
   - Admin: Full CRUD on `/api/v1/cms/admin/*`
 
-#### 3.5 `menu-service` (Port 5005)
+#### 3.5 `menu-service` (Port 8005)
 - **Owned Tables**: `Categories`, `MenuItems`, `MenuItemImages`, `MenuItemVariants`, `AddonGroups`, `AddonItems`, `MenuItemAddonGroups` (7 tables).
 - **Data Responsibility**: Food menu taxonomy, pricing, taxes, availability ("86") toggle, dish variants, and addon groups.
 - **Exposed REST Endpoints**:
@@ -138,14 +138,14 @@ In accordance with the project architectural decisions:
   - `GET /api/v1/menu/items/:id/details` (Internal API for Cart/Order Service pricing validation)
   - `PATCH /api/v1/menu/items/:id/availability`
 
-#### 3.6 `cart-service` (Port 5006)
+#### 3.6 `cart-service` (Port 8006)
 - **Owned Tables**: `ShoppingCarts`, `CartItems`, `CartItemAddons` (3 tables).
 - **Data Responsibility**: Live shopping carts for table QR code diners and authenticated customers.
 - **Exposed REST Endpoints**:
   - `GET /api/v1/cart/:sessionToken`, `POST /api/v1/cart/items`, `DELETE /api/v1/cart/items/:id`
   - `POST /api/v1/cart/checkout-summary`
 
-#### 3.7 `order-service` (Port 5007)
+#### 3.7 `order-service` (Port 8007)
 - **Owned Tables**: `Orders`, `OrderItems`, `OrderItemAddons`, `OrderStatusHistory`, `Coupons`, `CouponUsage` (6 tables).
 - **Data Responsibility**: Order ingestion, pricing calculations, status finite-state machine (FSM), coupon redemption, Saga orchestrator.
 - **Exposed REST Endpoints**:
@@ -154,7 +154,7 @@ In accordance with the project architectural decisions:
   - `PATCH /api/v1/orders/:id/status`
   - `POST /api/v1/orders/:id/apply-coupon`
 
-#### 3.8 `payment-service` (Port 5008)
+#### 3.8 `payment-service` (Port 8008)
 - **Owned Tables**: `Payments`, `PaymentTransactions`, `PaymentRefunds` (3 tables).
 - **Data Responsibility**: Razorpay payment order generation, webhook signature verification, split billing, offline cash/card settlement.
 - **Exposed REST Endpoints**:
@@ -164,7 +164,7 @@ In accordance with the project architectural decisions:
   - `POST /api/v1/payments/offline-settle`
   - `POST /api/v1/payments/refund`
 
-#### 3.9 `inventory-service` (Port 5009)
+#### 3.9 `inventory-service` (Port 8009)
 - **Owned Tables**: `Suppliers`, `InventoryIngredients`, `Recipes`, `RecipeIngredients`, `InventoryTransactions`, `PurchaseOrders`, `PurchaseOrderItems` (7 tables).
 - **Data Responsibility**: Ingredient catalog, Recipe Bill of Materials (BOM), automated stock deduction on order preparation, stock restitution on voided orders, vendor restocking.
 - **Exposed REST Endpoints**:
@@ -173,7 +173,7 @@ In accordance with the project architectural decisions:
   - `GET /api/v1/inventory/ingredients`, `POST /api/v1/inventory/spoilage`
   - `GET /api/v1/inventory/purchase-orders`
 
-#### 3.10 `kitchen-service` (Port 5010)
+#### 3.10 `kitchen-service` (Port 8010)
 - **Owned Tables**: `KitchenOrderTickets` (KOT), `KOTItems` (2 tables).
 - **Data Responsibility**: Kitchen Display System (KDS), routing tickets to stations (`GRILL`, `BAR`, `MAIN`), ticket aging, line-item cooking progress, bump events.
 - **Exposed REST Endpoints**:
@@ -181,7 +181,7 @@ In accordance with the project architectural decisions:
   - `GET /api/v1/kds/tickets/active`
   - `POST /api/v1/kds/tickets/:id/bump`
 
-#### 3.11 `reservation-service` (Port 5011)
+#### 3.11 `reservation-service` (Port 8011)
 - **Owned Tables**: `Reservations` (1 table).
 - **Data Responsibility**: Advance table booking, date/time conflict checks, party capacity validation.
 - **Exposed REST Endpoints**:
@@ -189,14 +189,14 @@ In accordance with the project architectural decisions:
   - `GET /api/v1/reservations`
   - `PATCH /api/v1/reservations/:id/check-in`
 
-#### 3.12 `notification-service` (Port 5012)
+#### 3.12 `notification-service` (Port 8012)
 - **Owned Tables**: `Notifications` (1 table).
 - **Data Responsibility**: Real-time Socket.IO WebSocket broadcasting and persistent user notifications.
 - **Exposed REST Endpoints**:
   - `POST /api/v1/notifications/internal/broadcast` (Internal endpoint called by microservices to push Socket.IO events)
   - `GET /api/v1/notifications/user/:userId`
 
-#### 3.13 `report-service` (Port 5013)
+#### 3.13 `report-service` (Port 8013)
 - **Owned Tables**: None (Pure aggregator microservice).
 - **Data Responsibility**: Calls REST endpoints across `order-service`, `payment-service`, and `inventory-service` to build daily sales reports, P&L summaries, and export Excel/PDF files.
 - **Exposed REST Endpoints**:

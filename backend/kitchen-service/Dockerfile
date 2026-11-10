@@ -9,7 +9,7 @@ WORKDIR /app/backend/kitchen-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5010
+EXPOSE 8010
 
 CMD ["npm", "start"]
 

@@ -9,7 +9,7 @@ WORKDIR /app/backend/auth-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5001
+EXPOSE 8001
 
 CMD ["npm", "start"]
 

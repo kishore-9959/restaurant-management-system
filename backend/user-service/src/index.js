@@ -7,7 +7,7 @@
 
 const http = require('http');
 const { app, logger } = require('./app');
-const { config } = require('../../shared');
+const { config } = require('@rms/shared');
 
 const PORT = config.ports.userService;
 const server = http.createServer(app);

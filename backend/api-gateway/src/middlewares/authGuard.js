@@ -7,14 +7,14 @@
  */
 
 const jwt = require('jsonwebtoken');
-const { config, errorResponse } = require('../../shared');
+const { config, redisClient, errorResponse } = require('@rms/shared');
 const { publicRoutePatterns } = require('../config/gatewayConfig');
 
 function isPublicRoute(path) {
   return publicRoutePatterns.some((pattern) => pattern.test(path));
 }
 
-function authGuard(req, res, next) {
+async function authGuard(req, res, next) {
   const currentPath = req.path;
 
   // 1. Allow whitelisted public endpoints without token
@@ -46,7 +46,24 @@ function authGuard(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, config.security.jwtAccessSecret);
-    req.user = decoded; // { id, email, role, branchId, ... }
+
+    // Check Redis revocation blacklist
+    if (decoded.jti) {
+      try {
+        const isRevoked = await redisClient.get(`auth:revoked:${decoded.jti}`);
+        if (isRevoked) {
+          return errorResponse(res, {
+            statusCode: 401,
+            code: 'TOKEN_REVOKED',
+            message: 'Access token has been revoked. Please log in again.',
+          });
+        }
+      } catch (redisErr) {
+        // Continue if Redis check fails temporarily
+      }
+    }
+
+    req.user = decoded; // { userId, email, roles, permissions, branchId, ... }
     next();
   } catch (error) {
     const isExpired = error.name === 'TokenExpiredError';

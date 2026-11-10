@@ -15,9 +15,11 @@ const {
   createRequestLogger,
   errorHandler,
   errorResponse,
-} = require('../../shared');
+} = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
+const authRoutes = require('./routes/authRoutes');
+const internalRoutes = require('./routes/internalRoutes');
 
 const logger = createServiceLogger('auth-service');
 const app = express();
@@ -29,11 +31,14 @@ app.use(createRequestLogger(logger));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Endpoint
+// Health Probes
 app.use(healthRoutes);
 
-// Scaffolded route groups (to be populated in Phase 4)
-// app.use('/api/v1/auth', authRoutes);
+// Internal service-to-service routes (supports both /api/v1/auth/internal and /internal)
+app.use(['/api/v1/auth/internal', '/internal'], internalRoutes);
+
+// Public & protected Auth API routes (supports both /api/v1/auth and root / for reverse proxies)
+app.use(['/api/v1/auth', '/'], authRoutes);
 
 // 404 Handler
 app.use((req, res) => {
@@ -47,4 +52,3 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 module.exports = { app, logger };
-

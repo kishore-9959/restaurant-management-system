@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-const { config } = require('../../shared');
+const { config } = require('@rms/shared');
 
 const services = [
   {
@@ -94,13 +94,13 @@ const services = [
 
 // Routes accessible without a JWT access token
 const publicRoutePatterns = [
-  /^\/api\/v1\/auth\/(login|register|pos-pin-login|refresh-token|forgot-password|reset-password)$/,
+  /^\/api\/v1\/auth\/(login|staff-login|register|pos-pin-login|refresh-token|logout|forgot-password|reset-password)$/,
   /^\/api\/v1\/cms\/public(\/.*)?$/,
   /^\/api\/v1\/menu\/public(\/.*)?$/,
   /^\/api\/v1\/tables\/qr\/[a-zA-Z0-9_-]+$/,
   /^\/api\/v1\/cart(\/.*)?$/,
   /^\/api\/v1\/payments\/razorpay\/webhook$/,
-  /^\/health$/,
+  /^\/health(\/.*)?$/,
 ];
 
 // RBAC restrictions for specific route prefixes

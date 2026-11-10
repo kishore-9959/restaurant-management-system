@@ -9,7 +9,7 @@ WORKDIR /app/backend/inventory-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5009
+EXPOSE 8009
 
 CMD ["npm", "start"]
 

@@ -20,12 +20,12 @@ The **Order Service** acts as the central **Saga Orchestrator** for order lifecy
 sequenceDiagram
     autonumber
     actor Customer as Guest / POS Staff
-    participant OrderSvc as Order Service (:5007)<br/>[Saga Orchestrator]
-    participant InvSvc as Inventory Service (:5009)
-    participant PaySvc as Payment Service (:5008)
-    participant KitchenSvc as Kitchen Service (:5010)
-    participant RestSvc as Restaurant Service (:5003)
-    participant NotifSvc as Notification Service (:5012)
+    participant OrderSvc as Order Service (:8007)<br/>[Saga Orchestrator]
+    participant InvSvc as Inventory Service (:8009)
+    participant PaySvc as Payment Service (:8008)
+    participant KitchenSvc as Kitchen Service (:8010)
+    participant RestSvc as Restaurant Service (:8003)
+    participant NotifSvc as Notification Service (:8012)
 
     Customer->>OrderSvc: POST /api/v1/orders (IdempotencyKey: 'IDEMP-9012')
     Note over OrderSvc: Step 1: Create Order Header (Status: PENDING_VALIDATION)

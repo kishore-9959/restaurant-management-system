@@ -17,7 +17,7 @@ const {
   createRequestLogger,
   errorHandler,
   errorResponse,
-} = require('../../shared');
+} = require('@rms/shared');
 
 const { services } = require('./config/gatewayConfig');
 const authGuard = require('./middlewares/authGuard');

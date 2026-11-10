@@ -69,33 +69,33 @@ The global environment configuration is grouped into 11 distinct operational cat
 | **Security** | `JWT_ACCESS_EXPIRES_IN` | `15m` | Access token lifespan |
 | **Security** | `JWT_REFRESH_EXPIRES_IN`| `7d` | Refresh token lifespan |
 | **Security** | `INTERNAL_SERVICE_KEY` | `shared_microservice_internal_secret_token` | Pre-shared key for service-to-service REST auth |
-| **Ports** | `PORT_API_GATEWAY` | `5000` | Ingress API Gateway port |
-| **Ports** | `PORT_AUTH_SERVICE` | `5001` | Auth Service port |
-| **Ports** | `PORT_USER_SERVICE` | `5002` | User & Staff Service port |
-| **Ports** | `PORT_RESTAURANT_SERVICE`| `5003`| Branches & Tables Service port |
-| **Ports** | `PORT_CMS_SERVICE` | `5004` | Dynamic Website CMS Service port |
-| **Ports** | `PORT_MENU_SERVICE` | `5005` | Menu & Catalog Service port |
-| **Ports** | `PORT_CART_SERVICE` | `5006` | Shopping Cart Service port |
-| **Ports** | `PORT_ORDER_SERVICE` | `5007` | Order Orchestration Service port |
-| **Ports** | `PORT_PAYMENT_SERVICE`| `5008` | Payments & Razorpay Service port |
-| **Ports** | `PORT_INVENTORY_SERVICE`| `5009`| Stock & Recipe BOM Service port |
-| **Ports** | `PORT_KITCHEN_SERVICE` | `5010` | Kitchen Display KDS Service port |
-| **Ports** | `PORT_RESERVATION_SERVICE`| `5011`| Table Reservations Service port |
-| **Ports** | `PORT_NOTIFICATION_SERVICE`| `5012`| WebSocket Socket.IO Service port |
-| **Ports** | `PORT_REPORT_SERVICE` | `5013` | Reporting & Analytics Service port |
-| **Internal URLs**| `URL_AUTH_SERVICE` | `http://localhost:5001` / `http://auth-service:5001` | REST endpoint for inter-service auth calls |
-| **Internal URLs**| `URL_USER_SERVICE` | `http://localhost:5002` / `http://user-service:5002` | REST endpoint for user profile lookups |
-| **Internal URLs**| `URL_RESTAURANT_SERVICE`| `http://localhost:5003` / `http://restaurant-service:5003` | REST endpoint for table lookups |
-| **Internal URLs**| `URL_CMS_SERVICE` | `http://localhost:5004` / `http://cms-service:5004` | REST endpoint for CMS content |
-| **Internal URLs**| `URL_MENU_SERVICE` | `http://localhost:5005` / `http://menu-service:5005` | REST endpoint for dish pricing verification |
-| **Internal URLs**| `URL_CART_SERVICE` | `http://localhost:5006` / `http://cart-service:5006` | REST endpoint for cart sessions |
-| **Internal URLs**| `URL_ORDER_SERVICE`| `http://localhost:5007` / `http://order-service:5007` | REST endpoint for order status checks |
-| **Internal URLs**| `URL_PAYMENT_SERVICE`| `http://localhost:5008` / `http://payment-service:5008` | REST endpoint for payment settlement |
-| **Internal URLs**| `URL_INVENTORY_SERVICE`| `http://localhost:5009` / `http://inventory-service:5009` | REST endpoint for BOM stock depletion |
-| **Internal URLs**| `URL_KITCHEN_SERVICE`| `http://localhost:5010` / `http://kitchen-service:5010` | REST endpoint for KOT ticket creation |
-| **Internal URLs**| `URL_RESERVATION_SERVICE`| `http://localhost:5011` / `http://reservation-service:5011`| REST endpoint for reservation validation |
-| **Internal URLs**| `URL_NOTIFICATION_SERVICE`| `http://localhost:5012` / `http://notification-service:5012`| REST endpoint for socket broadcasts |
-| **Internal URLs**| `URL_REPORT_SERVICE`| `http://localhost:5013` / `http://report-service:5013` | REST endpoint for report queries |
+| **Ports** | `PORT_API_GATEWAY` | `8000` | Ingress API Gateway port |
+| **Ports** | `PORT_AUTH_SERVICE` | `8001` | Auth Service port |
+| **Ports** | `PORT_USER_SERVICE` | `8002` | User & Staff Service port |
+| **Ports** | `PORT_RESTAURANT_SERVICE`| `8003`| Branches & Tables Service port |
+| **Ports** | `PORT_CMS_SERVICE` | `8004` | Dynamic Website CMS Service port |
+| **Ports** | `PORT_MENU_SERVICE` | `8005` | Menu & Catalog Service port |
+| **Ports** | `PORT_CART_SERVICE` | `8006` | Shopping Cart Service port |
+| **Ports** | `PORT_ORDER_SERVICE` | `8007` | Order Orchestration Service port |
+| **Ports** | `PORT_PAYMENT_SERVICE`| `8008` | Payments & Razorpay Service port |
+| **Ports** | `PORT_INVENTORY_SERVICE`| `8009`| Stock & Recipe BOM Service port |
+| **Ports** | `PORT_KITCHEN_SERVICE` | `8010` | Kitchen Display KDS Service port |
+| **Ports** | `PORT_RESERVATION_SERVICE`| `8011`| Table Reservations Service port |
+| **Ports** | `PORT_NOTIFICATION_SERVICE`| `8012`| WebSocket Socket.IO Service port |
+| **Ports** | `PORT_REPORT_SERVICE` | `8013` | Reporting & Analytics Service port |
+| **Internal URLs**| `URL_AUTH_SERVICE` | `http://localhost:8001` / `http://auth-service:8001` | REST endpoint for inter-service auth calls |
+| **Internal URLs**| `URL_USER_SERVICE` | `http://localhost:8002` / `http://user-service:8002` | REST endpoint for user profile lookups |
+| **Internal URLs**| `URL_RESTAURANT_SERVICE`| `http://localhost:8003` / `http://restaurant-service:8003` | REST endpoint for table lookups |
+| **Internal URLs**| `URL_CMS_SERVICE` | `http://localhost:8004` / `http://cms-service:8004` | REST endpoint for CMS content |
+| **Internal URLs**| `URL_MENU_SERVICE` | `http://localhost:8005` / `http://menu-service:8005` | REST endpoint for dish pricing verification |
+| **Internal URLs**| `URL_CART_SERVICE` | `http://localhost:8006` / `http://cart-service:8006` | REST endpoint for cart sessions |
+| **Internal URLs**| `URL_ORDER_SERVICE`| `http://localhost:8007` / `http://order-service:8007` | REST endpoint for order status checks |
+| **Internal URLs**| `URL_PAYMENT_SERVICE`| `http://localhost:8008` / `http://payment-service:8008` | REST endpoint for payment settlement |
+| **Internal URLs**| `URL_INVENTORY_SERVICE`| `http://localhost:8009` / `http://inventory-service:8009` | REST endpoint for BOM stock depletion |
+| **Internal URLs**| `URL_KITCHEN_SERVICE`| `http://localhost:8010` / `http://kitchen-service:8010` | REST endpoint for KOT ticket creation |
+| **Internal URLs**| `URL_RESERVATION_SERVICE`| `http://localhost:8011` / `http://reservation-service:8011`| REST endpoint for reservation validation |
+| **Internal URLs**| `URL_NOTIFICATION_SERVICE`| `http://localhost:8012` / `http://notification-service:8012`| REST endpoint for socket broadcasts |
+| **Internal URLs**| `URL_REPORT_SERVICE`| `http://localhost:8013` / `http://report-service:8013` | REST endpoint for report queries |
 | **Cloudinary** | `CLOUDINARY_CLOUD_NAME` | `demo-cloud` | Cloudinary tenant account name |
 | **Cloudinary** | `CLOUDINARY_API_KEY` | `123456789012345` | Cloudinary API Key |
 | **Cloudinary** | `CLOUDINARY_API_SECRET` | `abcdefghijklmnopqrstuvw` | Cloudinary API Secret for signed uploads |

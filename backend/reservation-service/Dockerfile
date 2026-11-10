@@ -9,7 +9,7 @@ WORKDIR /app/backend/reservation-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5011
+EXPOSE 8011
 
 CMD ["npm", "start"]
 

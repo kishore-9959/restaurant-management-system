@@ -1,11 +1,13 @@
 # Restaurant Management System (RMS)
 ## Master API Gateway Architecture & Routing Design
 
----
+-------
 
 ### 1. Gateway Purpose & Position in Architecture
 
-The **API Gateway** (`rms-api-gateway`, Port `5000`) serves as the single ingress entry point for all external traffic originating from the 4 client frontend applications (Customer Web App, Admin Dashboard, Kitchen KDS, and Staff POS). 
+
+
+The **API Gateway** (`rms-api-gateway`, Port `8000`) serves as the single ingress entry point for all external traffic originating from the 4 client frontend applications (Customer Web App, Admin Dashboard, Kitchen KDS, and Staff POS). 
 
 Client applications **never** call internal microservices directly. Instead, all requests terminate at the API Gateway, which handles cross-cutting concerns:
 - **Reverse Proxy Routing** to 13 downstream domain services.
@@ -23,7 +25,7 @@ Client applications **never** call internal microservices directly. Instead, all
                                      │ HTTPS REST / WSS
                                      ▼
                      ┌───────────────────────────────┐
-                     │   API Gateway (Port 5000)     │
+                     │   API Gateway (Port 8000)     │
                      │  • Helmet & CORS Protection   │
                      │  • Correlation ID Generator   │
                      │  • Rate Limiting (Redis Store)│
@@ -34,7 +36,7 @@ Client applications **never** call internal microservices directly. Instead, all
       ┌──────────────┬───────────────┼───────────────┬──────────────┐
       ▼              ▼               ▼               ▼              ▼
 [auth-service] [user-service] [restaurant-svc]  [cms-service]   [menu-service] ...
-    (:5001)        (:5002)         (:5003)         (:5004)         (:5005)
+    (:8001)        (:8002)         (:8003)         (:8004)         (:8005)
 ```
 
 ---
@@ -43,25 +45,25 @@ Client applications **never** call internal microservices directly. Instead, all
 
 | Public Ingress Path | Target Microservice | Target Internal URL | Access Control | Description |
 | :--- | :--- | :--- | :---: | :--- |
-| `/api/v1/auth/*` | `auth-service` | `http://localhost:5001` | Public / Self | Login, register, token refresh, PIN login |
-| `/api/v1/users/*` | `user-service` | `http://localhost:5002` | Authenticated | Profiles, addresses, staff management |
-| `/api/v1/restaurants/*` | `restaurant-service` | `http://localhost:5003` | Public / Admin | Master tenant restaurant details |
-| `/api/v1/branches/*` | `restaurant-service` | `http://localhost:5003` | Public / Staff | Branch locations, hours & geofencing |
-| `/api/v1/tables/*` | `restaurant-service` | `http://localhost:5003` | Public QR / Staff | Table layout, status & QR validation |
-| `/api/v1/shifts/*` | `restaurant-service` | `http://localhost:5003` | Staff / Manager | Cash drawer shift open, close & Z-report |
-| `/api/v1/cms/public/*` | `cms-service` | `http://localhost:5004` | Public (Cached) | Dynamic branding, banners, pages, FAQs |
-| `/api/v1/cms/admin/*` | `cms-service` | `http://localhost:5004` | Admin / Manager | Content authoring, page sections & SEO |
-| `/api/v1/menu/public/*` | `menu-service` | `http://localhost:5005` | Public (Cached) | Food menu catalog, categories, pricing |
-| `/api/v1/menu/admin/*` | `menu-service` | `http://localhost:5005` | Admin / Manager | Dishes CRUD, variants, 86 availability |
-| `/api/v1/cart/*` | `cart-service` | `http://localhost:5006` | Public Session | Shopping cart items, live subtotal |
-| `/api/v1/orders/*` | `order-service` | `http://localhost:5007` | Customer / Staff | Order creation, active order tracking |
-| `/api/v1/payments/*` | `payment-service` | `http://localhost:5008` | Customer / Staff | Razorpay checkout, webhooks & refunds |
-| `/api/v1/inventory/*` | `inventory-service` | `http://localhost:5009` | Manager / Chef | Ingredients, recipe BOM, stock alerts |
-| `/api/v1/kds/*` | `kitchen-service` | `http://localhost:5010` | Kitchen / Manager| Kitchen order tickets (KOT) & bump actions |
-| `/api/v1/reservations/*`| `reservation-service`| `http://localhost:5011` | Customer / Staff | Table bookings & slot conflict checks |
-| `/api/v1/notifications/*`| `notification-service`| `http://localhost:5012`| Authenticated | In-app notification alerts |
-| `/socket.io/*` | `notification-service`| `http://localhost:5012`| WebSocket WSS | Live real-time bidirectional push |
-| `/api/v1/reports/*` | `report-service` | `http://localhost:5013` | Admin / Manager | Sales summaries, menu velocity & exports |
+| `/api/v1/auth/*` | `auth-service` | `http://localhost:8001` | Public / Self | Login, register, token refresh, PIN login |
+| `/api/v1/users/*` | `user-service` | `http://localhost:8002` | Authenticated | Profiles, addresses, staff management |
+| `/api/v1/restaurants/*` | `restaurant-service` | `http://localhost:8003` | Public / Admin | Master tenant restaurant details |
+| `/api/v1/branches/*` | `restaurant-service` | `http://localhost:8003` | Public / Staff | Branch locations, hours & geofencing |
+| `/api/v1/tables/*` | `restaurant-service` | `http://localhost:8003` | Public QR / Staff | Table layout, status & QR validation |
+| `/api/v1/shifts/*` | `restaurant-service` | `http://localhost:8003` | Staff / Manager | Cash drawer shift open, close & Z-report |
+| `/api/v1/cms/public/*` | `cms-service` | `http://localhost:8004` | Public (Cached) | Dynamic branding, banners, pages, FAQs |
+| `/api/v1/cms/admin/*` | `cms-service` | `http://localhost:8004` | Admin / Manager | Content authoring, page sections & SEO |
+| `/api/v1/menu/public/*` | `menu-service` | `http://localhost:8005` | Public (Cached) | Food menu catalog, categories, pricing |
+| `/api/v1/menu/admin/*` | `menu-service` | `http://localhost:8005` | Admin / Manager | Dishes CRUD, variants, 86 availability |
+| `/api/v1/cart/*` | `cart-service` | `http://localhost:8006` | Public Session | Shopping cart items, live subtotal |
+| `/api/v1/orders/*` | `order-service` | `http://localhost:8007` | Customer / Staff | Order creation, active order tracking |
+| `/api/v1/payments/*` | `payment-service` | `http://localhost:8008` | Customer / Staff | Razorpay checkout, webhooks & refunds |
+| `/api/v1/inventory/*` | `inventory-service` | `http://localhost:8009` | Manager / Chef | Ingredients, recipe BOM, stock alerts |
+| `/api/v1/kds/*` | `kitchen-service` | `http://localhost:8010` | Kitchen / Manager| Kitchen order tickets (KOT) & bump actions |
+| `/api/v1/reservations/*`| `reservation-service`| `http://localhost:8011` | Customer / Staff | Table bookings & slot conflict checks |
+| `/api/v1/notifications/*`| `notification-service`| `http://localhost:8012`| Authenticated | In-app notification alerts |
+| `/socket.io/*` | `notification-service`| `http://localhost:8012`| WebSocket WSS | Live real-time bidirectional push |
+| `/api/v1/reports/*` | `report-service` | `http://localhost:8013` | Admin / Manager | Sales summaries, menu velocity & exports |
 | `/health` | API Gateway Local | Self | Public | Gateway & downstream service health status |
 
 ---
@@ -132,7 +134,7 @@ When the Gateway successfully authenticates a request, it decorates the outgoing
 
 ```http
 GET /api/v1/orders/100001 HTTP/1.1
-Host: localhost:5007
+Host: localhost:8007
 X-Correlation-ID: c8a41df2-421b-4f91-8841-39d2c25345a9
 X-Internal-Service-Key: rms_internal_microservice_mesh_secret_token_54321
 X-User-ID: 4

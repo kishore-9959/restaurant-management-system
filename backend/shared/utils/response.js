@@ -27,7 +27,7 @@ function successResponse(res, {
   const cid = correlationId || res.req?.correlationId || res.get('X-Correlation-ID');
 
   const payload = {
-    success: true,
+    success: statusCode < 400,
     data,
     message,
     ...(meta && { meta }),

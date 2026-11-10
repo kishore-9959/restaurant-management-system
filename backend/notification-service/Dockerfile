@@ -9,7 +9,7 @@ WORKDIR /app/backend/notification-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5012
+EXPOSE 8012
 
 CMD ["npm", "start"]
 

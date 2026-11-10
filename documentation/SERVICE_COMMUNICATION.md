@@ -19,16 +19,16 @@ Every inter-service transaction operates as an HTTP/1.1 or HTTP/2 REST request m
 [ Ingress Client ]
         │
         ▼
-[ API Gateway (Port 5000) ] ── (Injects X-Correlation-ID, verifies JWT)
+[ API Gateway (Port 8000) ] ── (Injects X-Correlation-ID, verifies JWT)
         │
         ├── HTTP GET /api/v1/orders/:id
         ▼
-[ Order Service (Port 5007) ]
+[ Order Service (Port 8007) ]
         │
-        ├── HTTP GET /api/v1/menu/items/:id ──► [ Menu Service (Port 5005) ]
-        ├── HTTP POST /api/v1/inventory/bom/deplete ──► [ Inventory Service (Port 5009) ]
-        ├── HTTP POST /api/v1/kds/tickets ──► [ Kitchen Service (Port 5010) ]
-        └── HTTP POST /api/v1/notifications/broadcast ──► [ Notification Service (Port 5012) ]
+        ├── HTTP GET /api/v1/menu/items/:id ──► [ Menu Service (Port 8005) ]
+        ├── HTTP POST /api/v1/inventory/bom/deplete ──► [ Inventory Service (Port 8009) ]
+        ├── HTTP POST /api/v1/kds/tickets ──► [ Kitchen Service (Port 8010) ]
+        └── HTTP POST /api/v1/notifications/broadcast ──► [ Notification Service (Port 8012) ]
 ```
 
 ---
@@ -118,9 +118,9 @@ Every microservice returns responses conforming to a universal JSON envelope:
 sequenceDiagram
     autonumber
     actor Client as User / POS Staff
-    participant GW as API Gateway (:5000)
-    participant Auth as Auth Service (:5001)
-    participant User as User Service (:5002)
+    participant GW as API Gateway (:8000)
+    participant Auth as Auth Service (:8001)
+    participant User as User Service (:8002)
 
     Client->>GW: POST /api/v1/auth/login (Phone/Email + Password)
     GW->>Auth: Forward POST /api/v1/auth/login
@@ -136,9 +136,9 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Order as Order Service (:5007)
-    participant Kitchen as Kitchen Service (:5010)
-    participant Notif as Notification Service (:5012)
+    participant Order as Order Service (:8007)
+    participant Kitchen as Kitchen Service (:8010)
+    participant Notif as Notification Service (:8012)
     actor KDSClient as Kitchen Monitor (Socket.IO)
 
     Order->>Kitchen: HTTP POST /api/v1/kds/tickets/create (OrderId, BranchId, Items)
@@ -153,8 +153,8 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Guest as Customer Browser
-    participant GW as API Gateway (:5000)
-    participant CMS as CMS Service (:5004)
+    participant GW as API Gateway (:8000)
+    participant CMS as CMS Service (:8004)
     participant Redis as Redis Cache (:6379)
     participant DB as MS SQL Server (RestaurantManagementDB)
 

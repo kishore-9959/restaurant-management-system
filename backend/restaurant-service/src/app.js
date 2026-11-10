@@ -15,7 +15,7 @@ const {
   createRequestLogger,
   errorHandler,
   errorResponse,
-} = require('../../shared');
+} = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
 

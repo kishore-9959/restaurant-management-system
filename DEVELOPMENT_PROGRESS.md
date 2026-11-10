@@ -38,7 +38,7 @@
 ### Detailed Microservices Architecture Deliverables Checklist (Completed)
 
 - [x] **Master Microservices Architecture Blueprint**:
-  - `documentation/MICROSERVICES_ARCHITECTURE.md`: Complete topology, container names, ports (5000-5013), and single-responsibility domains.
+  - `documentation/MICROSERVICES_ARCHITECTURE.md`: Complete topology, container names, ports (8000-8013), and single-responsibility domains.
   - `documentation/SYSTEM_ARCHITECTURE.md`: Updated to reflect microservices architecture, reverse proxy, and clean layered structure.
 - [x] **Shared Database 55-Table Ownership Mapping**:
   - `documentation/MICROSERVICES_DATABASE_MAPPING.md`: Strict 1:1 table-to-service mapping across all 55 tables. Zero ambiguous ownership, zero cross-service SQL joins.
@@ -95,23 +95,47 @@
 - [x] **Universal JSON Response Envelopes**:
   - `backend/shared/utils/response.js`: `successResponse` and `errorResponse` adhering to `SERVICE_COMMUNICATION.md`.
   - `backend/shared/middlewares/errorHandler.js`: Global error handling middleware.
-- [x] **API Gateway Ingress Architecture (Port 5000)**:
+- [x] **API Gateway Ingress Architecture (Port 8000)**:
   - `backend/api-gateway/src/app.js`: Express app mounting Helmet, CORS, and rate limiting.
-  - `backend/api-gateway/src/middlewares/authGuard.js`: Centralized JWT verification and public route whitelist bypass.
+  - `backend/api-gateway/src/middlewares/authGuard.js`: Centralized JWT verification and public route whitelist bypass (`/health(/*)?` unauthenticated).
   - `backend/api-gateway/src/middlewares/rbacGuard.js`: Role-based access control pre-checks.
   - `backend/api-gateway/src/proxy/serviceProxy.js`: Reverse proxy forwarding to 13 domain microservices with header decoration (`X-Correlation-ID`, `X-Internal-Service-Key`, `X-User-ID`, `X-User-Role`, `X-Branch-ID`).
-  - `backend/api-gateway/src/routes/health.js`: Health check probe aggregating Redis and downstream service availability.
-- [x] **Real-Time WebSocket Hub (`notification-service` Port 5012)**:
+  - `backend/api-gateway/src/routes/health.js`: Dedicated `/health/live` (process liveness), `/health/ready` (Redis readiness probe & downstream aggregator), and `/health` endpoints.
+- [x] **Separate Liveness & Readiness Probes (All 14 Microservices)**:
+  - `GET /health/live`: Process liveness probe verifying Node.js event loop, uptime, and memory consumption (RSS, Heap). Returns HTTP 200 with status `UP`.
+  - `GET /health/ready`: Dependency readiness probe verifying mandatory connections (MSSQL on port 1435, Redis on port 6379). Strict enforcement: never masks failure with HTTP 200 in development; returns HTTP 503 `DOWN` when any required dependency is unavailable.
+  - `GET /health`: General health check delegating to readiness check for backward compatibility with standard load balancers.
+  - Standardized JSON envelope across all 14 services adhering to `SERVICE_COMMUNICATION.md`.
+- [x] **Real-Time WebSocket Hub (`notification-service` Port 8012)**:
   - `backend/notification-service/src/socket/index.js`: Socket.IO server with room segmentation (`role:kitchen`, `role:pos`, `role:admin`, `table:{id}`, `order:{id}`).
   - `backend/notification-service/src/routes/internal.js`: HTTP REST endpoint `POST /api/v1/notifications/internal/broadcast` allowing domain services to dispatch live WebSocket pushes without message brokers.
 - [x] **Containerization & Master Docker Compose**:
   - `docker-compose.yml`: Master composition orchestrating 14 microservice containers, Microsoft SQL Server 2022, Redis 7 Alpine, and Nginx.
-  - 14 production-ready `Dockerfile` configurations (Node.js 20 LTS Alpine).
-  - `infrastructure/nginx/nginx.conf`: Nginx ingress reverse proxy forwarding HTTP REST to API Gateway (:5000) and WebSockets to Notification Service (:5012).
+  - 14 production-ready `Dockerfile` configurations (Node.js 20 LTS Alpine with EXPOSE 8000–8013).
+  - `infrastructure/nginx/nginx.conf`: Nginx ingress reverse proxy forwarding HTTP REST to API Gateway (:8000) and WebSockets to Notification Service (:8012).
   - `infrastructure/redis/redis.conf`: Redis production memory limits and LRU eviction policy.
 - [x] **Quality & Codebase Verification**:
   - 100% of generated JavaScript files (60 of 60) verified with zero syntax errors via `node.exe --check` / `vm.Script`.
   - Zero business logic, zero models, zero database modifications implemented, adhering strictly to Phase 3 boundaries.
+- [x] **Live Database & Infrastructure Audit (Verified on Port 8000 Series)**:
+  - **SQL Server (`RestaurantManagementDB`)**: Authenticated successfully via Sequelize `tedious` driver on `localhost:1435` (`Kishore\SQLDEV`).
+  - **Read-Only Verification Query**: Executed `SELECT 1 AS TestValue, DB_NAME() AS CurrentDB, @@SERVERNAME AS ServerName, (SELECT count(*) FROM sys.tables) AS TableCount` -> Verified `CurrentDB: RestaurantManagementDB`, confirmed **55 database tables** present on named instance `Kishore\SQLDEV`.
+  - **Redis Cache**: Verified connected on `localhost:6379`, `PING` returned `PONG`.
+  - **All 14 Microservices Dual Probe Verification**: 100% healthy and responding HTTP 200 via `scripts/verify-health.js`:
+    - `api-gateway` (:8000): **Live: UP (200)** | **Ready: UP (200)** (Redis CONNECTED)
+    - `auth-service` (:8001): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `user-service` (:8002): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `restaurant-service` (:8003): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `cms-service` (:8004): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED, Redis CONNECTED)
+    - `menu-service` (:8005): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED, Redis CONNECTED)
+    - `cart-service` (:8006): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED, Redis CONNECTED)
+    - `order-service` (:8007): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `payment-service` (:8008): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `inventory-service` (:8009): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `kitchen-service` (:8010): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `reservation-service` (:8011): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `notification-service` (:8012): **Live: UP (200)** | **Ready: UP (200)** (DB CONNECTED)
+    - `report-service` (:8013): **Live: UP (200)** | **Ready: UP (200)** (Stateless Aggregator)
 
 ---
 
@@ -161,9 +185,86 @@
 
 ---
 
-### Important Restrictions Observed
-- No backend Express application code has been generated.
-- No React frontend code has been created.
-- Razorpay payment SDK has not been integrated yet.
-- No destructive SQL commands were executed against the live server.
-- Database scripts have been authored, validated, and placed in the `database/` directory ready for deployment.
+## Phase 4 – Authentication & User Service Implementation (Completed)
+
+**Status:** **PHASE 4 COMPLETE – ALL 20 TEST REQUIREMENTS PASSED (100% SUCCESS)**  
+**Verification Date:** November 10, 2026  
+**Active Test Runner:** `scripts/test_phase4.js`  
+**API Documentation:** [`RMS_Phase4_API_Documentation.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase4_API_Documentation.md)  
+**Security Implementation Report:** [`RMS_Phase4_Security_Report.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase4_Security_Report.md)  
+**Postman Collection:** [`RMS_Phase4_Auth_User_Collection.json`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/postman/RMS_Phase4_Auth_User_Collection.json)  
+
+### 1. Database Table Ownership & Sequelize Mapping
+
+| Microservice | Port | Owned Database Tables | Sequelize Models | Schema Constraints Verified |
+| :--- | :---: | :--- | :--- | :--- |
+| **`auth-service`** | **8001** | `dbo.Roles`<br>`dbo.Permissions`<br>`dbo.RolePermissions`<br>`dbo.UserRoles` | `Role.js`<br>`Permission.js`<br>`RolePermission.js`<br>`UserRole.js` | Primary Keys, Foreign Keys, Unique constraints mapped to existing SQL Server tables. Zero table alterations or data migrations. |
+| **`user-service`** | **8002** | `dbo.Users`<br>`dbo.Employees`<br>`dbo.CustomerAddresses`<br>`dbo.AuditLogs` | `User.js`<br>`Employee.js`<br>`CustomerAddress.js`<br>`AuditLog.js` | Zero sensitive credentials (`PasswordHash`, `PasscodePin`) exposed. Default address toggle managed via atomic Sequelize transactions. |
+| **`api-gateway`** | **8000** | Reverse Proxy Ingress Router | N/A | Centralized JWT validation, Redis revocation checks, caller header decoration (`X-User-ID`, `X-User-Role`, `X-Branch-ID`). |
+
+### 2. Comprehensive Automated Verification Test Results (20/20 Passed)
+
+```
+================================================================
+  RMS PHASE 4: AUTH & USER MICROSERVICES VERIFICATION SUITE
+================================================================
+[✅ PASS] Test 01: Successful customer registration
+         ↳ Registered userId: 13, status: 201
+[✅ PASS] Test 02: Duplicate email registration rejection
+         ↳ Expected 409 Conflict, received: 409 (EMAIL_ALREADY_EXISTS)
+[✅ PASS] Test 03: Successful customer login
+         ↳ Logged in successfully, received fresh tokens
+[✅ PASS] Test 04: Incorrect password rejection
+         ↳ Expected 401 INVALID_CREDENTIALS, received: 401 (INVALID_CREDENTIALS)
+[✅ PASS] Test 05: Invalid access token rejection
+         ↳ Expected 401, received: 401 (INVALID_TOKEN)
+[✅ PASS] Test 06: Expired access token rejection
+         ↳ Expected 401 TOKEN_EXPIRED, received: 401 (TOKEN_EXPIRED)
+[✅ PASS] Test 07: Successful refresh token rotation
+         ↳ Old token rotated, new accessToken & refreshToken issued
+[✅ PASS] Test 08: Reused refresh token rejection (Reuse Detection)
+         ↳ Expected 403 TOKEN_REUSE_DETECTED, received: 403 (TOKEN_REUSE_DETECTED)
+[✅ PASS] Test 09: Logout and token revocation (Blacklist)
+         ↳ Token blacklisted in Redis; subsequent probe returned 401 TOKEN_REVOKED
+[✅ PASS] Test 10: Staff login (Authorization & Verification)
+         ↳ Customer denied (403), Admin authenticated successfully with SUPER_ADMIN role
+[✅ PASS] Test 11: Successful POS PIN login
+         ↳ Employee EMP-BLR-002 authenticated via 4-digit PIN for Branch 1
+[✅ PASS] Test 12: Five incorrect PIN attempts tracking
+         ↳ Recorded 4 consecutive failed attempts with decrementing retry counter
+[✅ PASS] Test 13: Two-minute PIN lockout enforcement
+         ↳ 5th failure locked account (HTTP 423 PIN_LOCKED, retryAfter: 120s)
+[✅ PASS] Test 14: Role-based access control (RBAC)
+         ↳ Customer denied access to /staff (403), Admin granted access (200)
+[✅ PASS] Test 15: Permission-based authorization validation
+         ↳ Verified 16 granular permissions bound to session (STAFF.MANAGE)
+[✅ PASS] Test 16: Branch-level access restrictions
+         ↳ Disallowed POS PIN login to branch 99 for employee assigned to branch 1
+[✅ PASS] Test 17: Customer profile retrieval
+         ↳ Profile fetched cleanly with zero sensitive credential exposure
+[✅ PASS] Test 18: Customer profile update
+         ↳ Updated firstName to 'Aarav-Updated', verified in response
+[✅ PASS] Test 19: Customer address CRUD (Single Default Enforcement)
+         ↳ Created 2 addresses, verified single default toggle, updated, soft deleted
+[✅ PASS] Test 20: Staff management CRUD (Create, Filter, Update, Terminate)
+         ↳ Created EMP-BLR-008, filtered, updated salary, terminated with user sync
+
+================================================================
+  TEST SUMMARY
+================================================================
+  Total Tests Run: 20
+  Passed:          20 / 20
+  Failed:          0
+================================================================
+🎉 ALL 20 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
+```
+
+---
+
+### Phase 4 Scope Boundaries Observed
+- Zero modifications made to `database/*.sql` scripts or pre-existing seed data.
+- Never called `sequelize.sync({ alter: true })` or `sequelize.sync({ force: true })`.
+- No cross-service direct table queries; mutual REST integration with `X-Internal-Service-Key` used exclusively.
+- All configurations strictly read from the single root `.env` file.
+- Phase 5 (Restaurant Service & Floor Management) has **not** been started. Awaiting user review and sign-off.
+

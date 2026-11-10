@@ -8,7 +8,7 @@
 const http = require('http');
 const { app, logger } = require('./app');
 const { initSocketServer } = require('./socket');
-const { config } = require('../../shared');
+const { config } = require('@rms/shared');
 
 const PORT = config.ports.notificationService;
 const server = http.createServer(app);

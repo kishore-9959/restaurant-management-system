@@ -8,7 +8,7 @@
  */
 
 const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
-const { config, errorResponse } = require('../../shared');
+const { config, errorResponse } = require('@rms/shared');
 
 /**
  * Creates an http-proxy-middleware instance for a target microservice
@@ -33,9 +33,15 @@ function createServiceProxy(targetUrl, serviceName) {
 
         // 3. Inject Authenticated Caller Context
         if (req.user) {
-          if (req.user.id) proxyReq.setHeader('X-User-ID', String(req.user.id));
-          if (req.user.role) proxyReq.setHeader('X-User-Role', String(req.user.role));
+          const userId = req.user.userId || req.user.id || req.user.sub;
+          if (userId) proxyReq.setHeader('X-User-ID', String(userId));
+
+          const roles = Array.isArray(req.user.roles) ? req.user.roles.join(',') : (req.user.role || '');
+          if (roles) proxyReq.setHeader('X-User-Role', String(roles));
+
+          if (req.user.userType) proxyReq.setHeader('X-User-Type', String(req.user.userType));
           if (req.user.branchId) proxyReq.setHeader('X-Branch-ID', String(req.user.branchId));
+          if (Array.isArray(req.user.permissions)) proxyReq.setHeader('X-User-Permissions', req.user.permissions.join(','));
         }
 
         // 4. Repipe JSON body if parsed upstream

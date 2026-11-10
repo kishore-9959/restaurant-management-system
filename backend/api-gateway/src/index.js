@@ -2,14 +2,14 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - API GATEWAY BOOTLOADER
  * File: backend/api-gateway/src/index.js
- * Description: Initializes HTTP server for API Gateway on PORT_API_GATEWAY (5000)
+ * Description: Initializes HTTP server for API Gateway on PORT_API_GATEWAY (8000)
  *              with process lifecycle handling and graceful shutdown.
  * ============================================================================
  */
 
 const http = require('http');
 const { app, logger } = require('./app');
-const { config } = require('../../shared');
+const { config } = require('@rms/shared');
 
 const PORT = config.ports.apiGateway;
 const server = http.createServer(app);

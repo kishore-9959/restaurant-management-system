@@ -9,7 +9,7 @@ WORKDIR /app/backend/report-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5013
+EXPOSE 8013
 
 CMD ["npm", "start"]
 

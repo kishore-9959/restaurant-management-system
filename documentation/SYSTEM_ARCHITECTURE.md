@@ -20,24 +20,24 @@ flowchart TB
     subgraph GatewayPerimeter["Ingress & Edge Perimeter"]
         direction TB
         NGINX["Nginx Reverse Proxy & SSL Termination\n(:80 / :443)"]
-        GATEWAY["API Gateway Service (:5000)\n• JWT Verification & RBAC Guards\n• Rate Limiting (Redis Store)\n• Request Correlation IDs (X-Correlation-ID)\n• Reverse Proxy Routing"]
+        GATEWAY["API Gateway Service (:8000)\n• JWT Verification & RBAC Guards\n• Rate Limiting (Redis Store)\n• Request Correlation IDs (X-Correlation-ID)\n• Reverse Proxy Routing"]
     end
 
     subgraph ServiceMesh["Microservices Domain Mesh (HTTP REST Inter-Service Fabric)"]
         direction TB
-        AUTH_SVC["Auth Service (:5001)"]
-        USER_SVC["User Service (:5002)"]
-        REST_SVC["Restaurant Service (:5003)"]
-        CMS_SVC["CMS Service (:5004)"]
-        MENU_SVC["Menu Service (:5005)"]
-        CART_SVC["Cart Service (:5006)"]
-        ORDER_SVC["Order Service (:5007)"]
-        PAY_SVC["Payment Service (:5008)"]
-        INV_SVC["Inventory Service (:5009)"]
-        KITCHEN_SVC["Kitchen Service (:5010)"]
-        RES_SVC["Reservation Service (:5011)"]
-        NOTIF_SVC["Notification Service (:5012 / Socket.IO)"]
-        REP_SVC["Report Service (:5013)"]
+        AUTH_SVC["Auth Service (:8001)"]
+        USER_SVC["User Service (:8002)"]
+        REST_SVC["Restaurant Service (:8003)"]
+        CMS_SVC["CMS Service (:8004)"]
+        MENU_SVC["Menu Service (:8005)"]
+        CART_SVC["Cart Service (:8006)"]
+        ORDER_SVC["Order Service (:8007)"]
+        PAY_SVC["Payment Service (:8008)"]
+        INV_SVC["Inventory Service (:8009)"]
+        KITCHEN_SVC["Kitchen Service (:8010)"]
+        RES_SVC["Reservation Service (:8011)"]
+        NOTIF_SVC["Notification Service (:8012 / Socket.IO)"]
+        REP_SVC["Report Service (:8013)"]
     end
 
     subgraph Persistence["Persistence & State Layer"]

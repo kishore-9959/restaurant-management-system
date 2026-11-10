@@ -87,21 +87,21 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_AUTH_SERVICE=http://auth-service:5001
-      - URL_USER_SERVICE=http://user-service:5002
-      - URL_RESTAURANT_SERVICE=http://restaurant-service:5003
-      - URL_CMS_SERVICE=http://cms-service:5004
-      - URL_MENU_SERVICE=http://menu-service:5005
-      - URL_CART_SERVICE=http://cart-service:5006
-      - URL_ORDER_SERVICE=http://order-service:5007
-      - URL_PAYMENT_SERVICE=http://payment-service:5008
-      - URL_INVENTORY_SERVICE=http://inventory-service:5009
-      - URL_KITCHEN_SERVICE=http://kitchen-service:5010
-      - URL_RESERVATION_SERVICE=http://reservation-service:5011
-      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
-      - URL_REPORT_SERVICE=http://report-service:5013
+      - URL_AUTH_SERVICE=http://auth-service:8001
+      - URL_USER_SERVICE=http://user-service:8002
+      - URL_RESTAURANT_SERVICE=http://restaurant-service:8003
+      - URL_CMS_SERVICE=http://cms-service:8004
+      - URL_MENU_SERVICE=http://menu-service:8005
+      - URL_CART_SERVICE=http://cart-service:8006
+      - URL_ORDER_SERVICE=http://order-service:8007
+      - URL_PAYMENT_SERVICE=http://payment-service:8008
+      - URL_INVENTORY_SERVICE=http://inventory-service:8009
+      - URL_KITCHEN_SERVICE=http://kitchen-service:8010
+      - URL_RESERVATION_SERVICE=http://reservation-service:8011
+      - URL_NOTIFICATION_SERVICE=http://notification-service:8012
+      - URL_REPORT_SERVICE=http://report-service:8013
     ports:
-      - "5000:5000"
+      - "8000:8000"
     depends_on:
       - redis
       - mssql
@@ -123,7 +123,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5001:5001"
+      - "8001:8001"
     depends_on:
       - mssql
     networks:
@@ -141,7 +141,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5002:5002"
+      - "8002:8002"
     depends_on:
       - mssql
     networks:
@@ -159,7 +159,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5003:5003"
+      - "8003:8003"
     depends_on:
       - mssql
     networks:
@@ -177,7 +177,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5004:5004"
+      - "8004:8004"
     depends_on:
       - mssql
       - redis
@@ -196,7 +196,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5005:5005"
+      - "8005:8005"
     depends_on:
       - mssql
       - redis
@@ -214,9 +214,9 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_MENU_SERVICE=http://menu-service:5005
+      - URL_MENU_SERVICE=http://menu-service:8005
     ports:
-      - "5006:5006"
+      - "8006:8006"
     depends_on:
       - mssql
       - redis
@@ -234,13 +234,13 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_MENU_SERVICE=http://menu-service:5005
-      - URL_INVENTORY_SERVICE=http://inventory-service:5009
-      - URL_KITCHEN_SERVICE=http://kitchen-service:5010
-      - URL_PAYMENT_SERVICE=http://payment-service:5008
-      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+      - URL_MENU_SERVICE=http://menu-service:8005
+      - URL_INVENTORY_SERVICE=http://inventory-service:8009
+      - URL_KITCHEN_SERVICE=http://kitchen-service:8010
+      - URL_PAYMENT_SERVICE=http://payment-service:8008
+      - URL_NOTIFICATION_SERVICE=http://notification-service:8012
     ports:
-      - "5007:5007"
+      - "8007:8007"
     depends_on:
       - mssql
     networks:
@@ -257,10 +257,10 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_ORDER_SERVICE=http://order-service:5007
-      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+      - URL_ORDER_SERVICE=http://order-service:8007
+      - URL_NOTIFICATION_SERVICE=http://notification-service:8012
     ports:
-      - "5008:5008"
+      - "8008:8008"
     depends_on:
       - mssql
     networks:
@@ -278,7 +278,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5009:5009"
+      - "8009:8009"
     depends_on:
       - mssql
     networks:
@@ -295,9 +295,9 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+      - URL_NOTIFICATION_SERVICE=http://notification-service:8012
     ports:
-      - "5010:5010"
+      - "8010:8010"
     depends_on:
       - mssql
     networks:
@@ -314,10 +314,10 @@ services:
     environment:
       - DB_HOST=mssql
       - REDIS_HOST=redis
-      - URL_RESTAURANT_SERVICE=http://restaurant-service:5003
-      - URL_NOTIFICATION_SERVICE=http://notification-service:5012
+      - URL_RESTAURANT_SERVICE=http://restaurant-service:8003
+      - URL_NOTIFICATION_SERVICE=http://notification-service:8012
     ports:
-      - "5011:5011"
+      - "8011:8011"
     depends_on:
       - mssql
     networks:
@@ -335,7 +335,7 @@ services:
       - DB_HOST=mssql
       - REDIS_HOST=redis
     ports:
-      - "5012:5012"
+      - "8012:8012"
     depends_on:
       - mssql
     networks:
@@ -350,11 +350,11 @@ services:
     env_file:
       - .env
     environment:
-      - URL_ORDER_SERVICE=http://order-service:5007
-      - URL_PAYMENT_SERVICE=http://payment-service:5008
-      - URL_INVENTORY_SERVICE=http://inventory-service:5009
+      - URL_ORDER_SERVICE=http://order-service:8007
+      - URL_PAYMENT_SERVICE=http://payment-service:8008
+      - URL_INVENTORY_SERVICE=http://inventory-service:8009
     ports:
-      - "5013:5013"
+      - "8013:8013"
     networks:
       - rms-network
 

@@ -9,7 +9,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { serviceAuthMiddleware, successResponse, errorResponse } = require('../../shared');
+const { serviceAuthMiddleware, successResponse, errorResponse } = require('@rms/shared');
 const { broadcastNotification } = require('../socket');
 
 router.post('/broadcast', serviceAuthMiddleware, (req, res) => {

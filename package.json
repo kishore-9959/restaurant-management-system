@@ -12,20 +12,26 @@
     "docker:logs": "docker compose logs -f",
     "docker:ps": "docker compose ps",
     "install:all": "npm install --workspaces",
-    "dev:gateway": "node --watch backend/api-gateway/src/index.js",
-    "dev:auth": "node --watch backend/auth-service/src/index.js",
-    "dev:user": "node --watch backend/user-service/src/index.js",
-    "dev:restaurant": "node --watch backend/restaurant-service/src/index.js",
-    "dev:cms": "node --watch backend/cms-service/src/index.js",
-    "dev:menu": "node --watch backend/menu-service/src/index.js",
-    "dev:cart": "node --watch backend/cart-service/src/index.js",
-    "dev:order": "node --watch backend/order-service/src/index.js",
-    "dev:payment": "node --watch backend/payment-service/src/index.js",
-    "dev:inventory": "node --watch backend/inventory-service/src/index.js",
-    "dev:kitchen": "node --watch backend/kitchen-service/src/index.js",
-    "dev:reservation": "node --watch backend/reservation-service/src/index.js",
-    "dev:notification": "node --watch backend/notification-service/src/index.js",
-    "dev:report": "node --watch backend/report-service/src/index.js"
+    "services:start": "cmd /c scripts\\start-all.bat",
+    "services:stop": "cmd /c scripts\\stop-all.bat",
+    "services:restart": "cmd /c scripts\\restart-all.bat",
+    "dev": "npm run dev:all",
+    "dev:all": "concurrently -k -p \"[{name}]\" -n \"GATEWAY,AUTH,USER,REST,CMS,MENU,CART,ORDER,PAY,INV,KITCHEN,RES,NOTIF,REP\" -c \"magenta,blue,cyan,green,yellow,red,white,gray,magenta.bold,blue.bold,cyan.bold,green.bold,yellow.bold,red.bold\" \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:user\" \"npm run dev:restaurant\" \"npm run dev:cms\" \"npm run dev:menu\" \"npm run dev:cart\" \"npm run dev:order\" \"npm run dev:payment\" \"npm run dev:inventory\" \"npm run dev:kitchen\" \"npm run dev:reservation\" \"npm run dev:notification\" \"npm run dev:report\"",
+    "dev:core": "concurrently -k -p \"[{name}]\" -n \"GATEWAY,AUTH,USER\" -c \"magenta,blue,cyan\" \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:user\"",
+    "dev:gateway": "node.exe --watch backend/api-gateway/src/index.js",
+    "dev:auth": "node.exe --watch backend/auth-service/src/index.js",
+    "dev:user": "node.exe --watch backend/user-service/src/index.js",
+    "dev:restaurant": "node.exe --watch backend/restaurant-service/src/index.js",
+    "dev:cms": "node.exe --watch backend/cms-service/src/index.js",
+    "dev:menu": "node.exe --watch backend/menu-service/src/index.js",
+    "dev:cart": "node.exe --watch backend/cart-service/src/index.js",
+    "dev:order": "node.exe --watch backend/order-service/src/index.js",
+    "dev:payment": "node.exe --watch backend/payment-service/src/index.js",
+    "dev:inventory": "node.exe --watch backend/inventory-service/src/index.js",
+    "dev:kitchen": "node.exe --watch backend/kitchen-service/src/index.js",
+    "dev:reservation": "node.exe --watch backend/reservation-service/src/index.js",
+    "dev:notification": "node.exe --watch backend/notification-service/src/index.js",
+    "dev:report": "node.exe --watch backend/report-service/src/index.js"
   },
   "keywords": [
     "restaurant-management",
@@ -37,6 +43,8 @@
     "nodejs"
   ],
   "author": "Antigravity Engineering",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
 }
-

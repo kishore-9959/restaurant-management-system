@@ -15,9 +15,13 @@ const {
   createRequestLogger,
   errorHandler,
   errorResponse,
-} = require('../../shared');
+} = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
+const customerRoutes = require('./routes/customerRoutes');
+const staffRoutes = require('./routes/staffRoutes');
+const userRoutes = require('./routes/userRoutes');
+const internalRoutes = require('./routes/internalRoutes');
 
 const logger = createServiceLogger('user-service');
 const app = express();
@@ -29,8 +33,22 @@ app.use(createRequestLogger(logger));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health Probes
 app.use(healthRoutes);
 
+// Internal service-to-service endpoints
+app.use(['/api/v1/users/internal', '/internal'], internalRoutes);
+
+// Staff management endpoints
+app.use(['/api/v1/users/staff', '/staff'], staffRoutes);
+
+// Customer endpoints (/profile, /addresses)
+app.use(['/api/v1/users', '/'], customerRoutes);
+
+// General User administration endpoints (/, /:id, /:id/status)
+app.use(['/api/v1/users', '/'], userRoutes);
+
+// 404 Handler
 app.use((req, res) => {
   return errorResponse(res, {
     statusCode: 404,
@@ -42,4 +60,3 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 module.exports = { app, logger };
-

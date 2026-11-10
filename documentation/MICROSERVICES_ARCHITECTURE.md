@@ -19,23 +19,23 @@ flowchart TB
 
     subgraph Ingress["Edge & Gateway Tier"]
         NGINX["Nginx Reverse Proxy\n(:80 / :443)"]
-        GATEWAY["API Gateway Service\n(Node.js / Express :5000)\n• JWT Verification & RBAC\n• Rate Limiting & Helmet\n• Request Correlation IDs\n• Reverse Proxy Routing"]
+        GATEWAY["API Gateway Service\n(Node.js / Express :8000)\n• JWT Verification & RBAC\n• Rate Limiting & Helmet\n• Request Correlation IDs\n• Reverse Proxy Routing"]
     end
 
     subgraph ServiceMesh["Microservices Domain Mesh (HTTP REST Inter-Service Fabric)"]
-        AUTH_SVC["Auth Service\n(:5001)"]
-        USER_SVC["User Service\n(:5002)"]
-        REST_SVC["Restaurant Service\n(:5003)"]
-        CMS_SVC["CMS Service\n(:5004)"]
-        MENU_SVC["Menu Service\n(:5005)"]
-        CART_SVC["Cart Service\n(:5006)"]
-        ORDER_SVC["Order Service\n(:5007)"]
-        PAY_SVC["Payment Service\n(:5008)"]
-        INV_SVC["Inventory Service\n(:5009)"]
-        KITCHEN_SVC["Kitchen Service\n(:5010)"]
-        RES_SVC["Reservation Service\n(:5011)"]
-        NOTIF_SVC["Notification Service\n(:5012 / Socket.IO)"]
-        REP_SVC["Report Service\n(:5013)"]
+        AUTH_SVC["Auth Service\n(:8001)"]
+        USER_SVC["User Service\n(:8002)"]
+        REST_SVC["Restaurant Service\n(:8003)"]
+        CMS_SVC["CMS Service\n(:8004)"]
+        MENU_SVC["Menu Service\n(:8005)"]
+        CART_SVC["Cart Service\n(:8006)"]
+        ORDER_SVC["Order Service\n(:8007)"]
+        PAY_SVC["Payment Service\n(:8008)"]
+        INV_SVC["Inventory Service\n(:8009)"]
+        KITCHEN_SVC["Kitchen Service\n(:8010)"]
+        RES_SVC["Reservation Service\n(:8011)"]
+        NOTIF_SVC["Notification Service\n(:8012 / Socket.IO)"]
+        REP_SVC["Report Service\n(:8013)"]
     end
 
     subgraph InfraTier["Shared Infrastructure & Data Tier"]
@@ -72,20 +72,20 @@ Each microservice runs in its own Node.js runtime process, maintains its own iso
 
 | # | Microservice Name | Container Name | Port | Primary Domain Responsibilities |
 | :---: | :--- | :--- | :---: | :--- |
-| **1** | **API Gateway** | `rms-api-gateway` | `5000` | Ingress traffic routing, centralized JWT authentication verification, RBAC role guard enforcement, IP rate limiting, CORS headers, correlation ID injection (`X-Correlation-ID`), downstream error translation, and service health aggregation. |
-| **2** | **Auth Service** | `rms-auth-service` | `5001` | Customer registration, credential verification, JWT access & refresh token issuance and rotation, password hashing (`bcrypt`), POS 4-digit PIN verification, password reset tokens, and service-to-service internal auth tokens. |
-| **3** | **User Service** | `rms-user-service` | `5002` | User profiles, employee records, roles & permission mapping, staff designations, customer addresses, emergency contacts, and administrative user management. |
-| **4** | **Restaurant Service** | `rms-restaurant-service`| `5003` | Multi-branch management, branch operating hours, dining sections, table layout coordinates (`PosX`, `PosY`), QR code hash generation, table status transitions (`Available`, `Occupied`, `Cleaning`), and POS cash register shift balancing (`OpeningFloat`, `ExpectedCash`, `ActualCash`, Z-reports). |
-| **5** | **CMS Service** | `rms-cms-service` | `5004` | 100% dynamic website content management: website settings, branding, logos, hero banners, dynamic page sections (`HERO_SLIDER`, `ABOUT_STORY`, `STATS_COUNTER`), navigation menus, multi-column footers, FAQs, testimonials, social links, SEO tags, Cloudinary image asset upload signing, and guest contact inquiries. |
-| **6** | **Menu Service** | `rms-menu-service` | `5005` | Food category taxonomy, menu items, dish pricing, tax rates, dietary tags (`VEG`, `NON_VEG`, `VEGAN`), gallery images, size variants (`Regular`, `Large`), addon groups & items, and real-time "86" out-of-stock toggling with Redis cache invalidation. |
-| **7** | **Cart Service** | `rms-cart-service` | `5006` | Persistent shopping carts for guest table sessions (QR code diners) and authenticated users, cart item quantities, addon choices, live subtotal computation, and cart expiration lifecycle. |
-| **8** | **Order Service** | `rms-order-service` | `5007` | Omnichannel order lifecycle orchestration (`DINE_IN`, `TAKEAWAY`, `DELIVERY`), order placement, tax & service charge calculation, historical price snapshotting, order status transitions (`PLACED` -> `ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED` -> `COMPLETED`), promotional coupons & discount validations, and distributed Saga coordination. |
-| **9** | **Payment Service** | `rms-payment-service` | `5008` | Razorpay order creation, payment checkout verification via HMAC SHA256 cryptographic signatures, asynchronous payment webhook ingestion, offline tender settlement (`CASH`, `CARD`, `UPI`), split billing calculations, and refund processing. |
-| **10**| **Inventory Service** | `rms-inventory-service`| `5009` | Raw material ingredients catalog, metric units of measure (`KG`, `LITER`, `PIECE`), stock balances, reorder level warnings, multi-level Recipe Bill of Materials (BOM) linking dishes/variants to ingredient consumption, automated stock depletion, stock restitution on voided orders, spoilage logging, and supplier purchase orders. |
-| **11**| **Kitchen Service** | `rms-kitchen-service` | `5010` | Kitchen Display System (KDS) operations, Kitchen Order Ticket (KOT) generation, station routing (`MAIN_KITCHEN`, `GRILL`, `BAR`, `DESSERT`), line-item cooking checklist status (`COOKING`, `READY`), cooking urgency timers, and ticket bump events. |
-| **12**| **Reservation Service** | `rms-reservation-service`| `5011` | Table reservation scheduling, timeslot capacity and party size conflict prevention, deposit tracking, guest check-in, and auto-release policies. |
-| **13**| **Notification Service** | `rms-notification-service`| `5012` | Centralized real-time WebSocket hub using Socket.IO: room segmentation (`role:kitchen`, `role:pos`, `role:admin`, `table:{id}`, `order:{id}`), live KOT dispatch, order status tracking progress, waiter pickup calls, and in-app administrative alerts. |
-| **14**| **Report Service** | `rms-report-service` | `5013` | Aggregated executive intelligence, daily sales summary, payment method breakdowns, menu velocity analysis (BCG matrix), inventory valuation, wastage cost analysis, and export pipelines for Excel and PDF. |
+| **1** | **API Gateway** | `rms-api-gateway` | `8000` | Ingress traffic routing, centralized JWT authentication verification, RBAC role guard enforcement, IP rate limiting, CORS headers, correlation ID injection (`X-Correlation-ID`), downstream error translation, and service health aggregation. |
+| **2** | **Auth Service** | `rms-auth-service` | `8001` | Customer registration, credential verification, JWT access & refresh token issuance and rotation, password hashing (`bcrypt`), POS 4-digit PIN verification, password reset tokens, and service-to-service internal auth tokens. |
+| **3** | **User Service** | `rms-user-service` | `8002` | User profiles, employee records, roles & permission mapping, staff designations, customer addresses, emergency contacts, and administrative user management. |
+| **4** | **Restaurant Service** | `rms-restaurant-service`| `8003` | Multi-branch management, branch operating hours, dining sections, table layout coordinates (`PosX`, `PosY`), QR code hash generation, table status transitions (`Available`, `Occupied`, `Cleaning`), and POS cash register shift balancing (`OpeningFloat`, `ExpectedCash`, `ActualCash`, Z-reports). |
+| **5** | **CMS Service** | `rms-cms-service` | `8004` | 100% dynamic website content management: website settings, branding, logos, hero banners, dynamic page sections (`HERO_SLIDER`, `ABOUT_STORY`, `STATS_COUNTER`), navigation menus, multi-column footers, FAQs, testimonials, social links, SEO tags, Cloudinary image asset upload signing, and guest contact inquiries. |
+| **6** | **Menu Service** | `rms-menu-service` | `8005` | Food category taxonomy, menu items, dish pricing, tax rates, dietary tags (`VEG`, `NON_VEG`, `VEGAN`), gallery images, size variants (`Regular`, `Large`), addon groups & items, and real-time "86" out-of-stock toggling with Redis cache invalidation. |
+| **7** | **Cart Service** | `rms-cart-service` | `8006` | Persistent shopping carts for guest table sessions (QR code diners) and authenticated users, cart item quantities, addon choices, live subtotal computation, and cart expiration lifecycle. |
+| **8** | **Order Service** | `rms-order-service` | `8007` | Omnichannel order lifecycle orchestration (`DINE_IN`, `TAKEAWAY`, `DELIVERY`), order placement, tax & service charge calculation, historical price snapshotting, order status transitions (`PLACED` -> `ACCEPTED` -> `PREPARING` -> `READY` -> `SERVED` -> `COMPLETED`), promotional coupons & discount validations, and distributed Saga coordination. |
+| **9** | **Payment Service** | `rms-payment-service` | `8008` | Razorpay order creation, payment checkout verification via HMAC SHA256 cryptographic signatures, asynchronous payment webhook ingestion, offline tender settlement (`CASH`, `CARD`, `UPI`), split billing calculations, and refund processing. |
+| **10**| **Inventory Service** | `rms-inventory-service`| `8009` | Raw material ingredients catalog, metric units of measure (`KG`, `LITER`, `PIECE`), stock balances, reorder level warnings, multi-level Recipe Bill of Materials (BOM) linking dishes/variants to ingredient consumption, automated stock depletion, stock restitution on voided orders, spoilage logging, and supplier purchase orders. |
+| **11**| **Kitchen Service** | `rms-kitchen-service` | `8010` | Kitchen Display System (KDS) operations, Kitchen Order Ticket (KOT) generation, station routing (`MAIN_KITCHEN`, `GRILL`, `BAR`, `DESSERT`), line-item cooking checklist status (`COOKING`, `READY`), cooking urgency timers, and ticket bump events. |
+| **12**| **Reservation Service** | `rms-reservation-service`| `8011` | Table reservation scheduling, timeslot capacity and party size conflict prevention, deposit tracking, guest check-in, and auto-release policies. |
+| **13**| **Notification Service** | `rms-notification-service`| `8012` | Centralized real-time WebSocket hub using Socket.IO: room segmentation (`role:kitchen`, `role:pos`, `role:admin`, `table:{id}`, `order:{id}`), live KOT dispatch, order status tracking progress, waiter pickup calls, and in-app administrative alerts. |
+| **14**| **Report Service** | `rms-report-service` | `8013` | Aggregated executive intelligence, daily sales summary, payment method breakdowns, menu velocity analysis (BCG matrix), inventory valuation, wastage cost analysis, and export pipelines for Excel and PDF. |
 
 ---
 

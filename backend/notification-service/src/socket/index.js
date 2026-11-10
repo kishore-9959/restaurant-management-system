@@ -7,7 +7,7 @@
  */
 
 const { Server } = require('socket.io');
-const { config } = require('../../shared');
+const { config } = require('@rms/shared');
 
 let io = null;
 

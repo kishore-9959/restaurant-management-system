@@ -9,7 +9,7 @@ WORKDIR /app/backend/payment-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5008
+EXPOSE 8008
 
 CMD ["npm", "start"]
 

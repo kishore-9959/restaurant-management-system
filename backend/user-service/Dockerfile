@@ -9,7 +9,7 @@ WORKDIR /app/backend/user-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5002
+EXPOSE 8002
 
 CMD ["npm", "start"]
 

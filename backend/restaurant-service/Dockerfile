@@ -9,7 +9,7 @@ WORKDIR /app/backend/restaurant-service
 
 RUN npm install --omit=dev
 
-EXPOSE 5003
+EXPOSE 8003
 
 CMD ["npm", "start"]
 
