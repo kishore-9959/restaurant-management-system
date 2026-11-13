@@ -9,7 +9,7 @@
 - **Database Name**: `RestaurantManagementDB`
 - **Default Collation**: `Latin1_General_100_CI_AS_SC_UTF8` (Full multilingual and Unicode support)
 - **Concurrency & Isolation**: `READ_COMMITTED_SNAPSHOT ON` (RCSI) and `ALLOW_SNAPSHOT_ISOLATION ON`
-- **ORM Integration**: Sequelize v6 (Node.js) via native `tedious` TDS driver
+- **Database Access Pattern**: Stored Procedures ONLY via Node.js native `mssql` (TDS) connection pool (`backend/shared/config/database.js`). Zero ORM / No Sequelize models.
 
 #### Core Architectural Tenets
 1. **Multi-Branch Isolation**: Every transactional and operational table includes a foreign key `BranchId` to ensure strict tenant data segregation across multi-unit restaurant operations.
@@ -168,4 +168,76 @@ To ensure zero cascade errors in Microsoft SQL Server, cascade paths have been d
 - **Catalog Cascade**: `ON DELETE CASCADE` from `MenuItems` -> `MenuItemVariants`, `MenuItemImages`, `MenuItemAddonGroups`.
 - **Protected Master References**: `Orders.BranchId`, `Orders.TableId`, `Orders.CustomerId` use `ON DELETE NO ACTION` to guarantee that transaction records cannot be orphaned or accidentally purged.
 - **Soft Deletion Filtering**: Master entities are never hard deleted; `IsDeleted = 1` preserves history.
+
+---
+
+### 5. Stored Procedures Catalog (58 Procedures Total)
+
+All database mutations and queries execute through dedicated, compiled SQL Server stored procedures:
+
+#### 5.1 Auth & User Management (`database/07_AuthUserStoredProcedures.sql`)
+1. `dbo.usp_User_GetByEmailOrPhone`: Retrieve user with roles and permissions by email or phone.
+2. `dbo.usp_User_GetById`: Retrieve full user profile by `UserId` with roles.
+3. `dbo.usp_User_Create`: Insert new user with hashed password and initial role assignment.
+4. `dbo.usp_User_CheckExists`: Verify uniqueness of email or phone.
+5. `dbo.usp_User_UpdateProfile`: Update user personal info (`FirstName`, `LastName`, `AvatarUrl`).
+6. `dbo.usp_User_UpdateLastLogin`: Update `LastLoginAt` timestamp.
+7. `dbo.usp_User_SetStatus`: Activate/deactivate user accounts.
+8. `dbo.usp_User_GetPinAuth`: Fetch staff credentials and PIN hash for POS login.
+9. `dbo.usp_Auth_AssignRole`: Assign security role to user for a branch.
+10. `dbo.usp_Auth_GetUserRolesAndPermissions`: Retrieve active roles and distinct permissions for a user.
+11. `dbo.usp_Auth_GetAllRoles`: List all available system and custom roles.
+12. `dbo.usp_CustomerAddress_Create`: Atomic single-default address creation.
+13. `dbo.usp_CustomerAddress_GetByUserId`: List addresses for customer.
+14. `dbo.usp_CustomerAddress_GetById`: Fetch single address details.
+15. `dbo.usp_CustomerAddress_Update`: Update delivery address and manage default address flag.
+16. `dbo.usp_CustomerAddress_Delete`: Soft delete customer address.
+17. `dbo.usp_Employee_Create`: Register employee HR record and designation.
+18. `dbo.usp_Employee_GetById`: Fetch employee record by `EmployeeId`.
+19. `dbo.usp_Employee_GetByUserId`: Fetch employee record by `UserId`.
+20. `dbo.usp_Employee_List`: List staff with branch, designation, and status filters.
+21. `dbo.usp_Employee_Update`: Update employee HR details, salary, and emergency contacts.
+22. `dbo.usp_Employee_UpdateStatus`: Synchronize employee employment status with user account status.
+23. `dbo.usp_AuditLog_Create`: Append immutable security audit log entry.
+
+#### 5.2 Operations & Transactions (`database/06_StoredProcedures.sql`)
+24. `dbo.sp_PlaceOrderWithBOMDepletion`: Atomic order placement + KOT generation + recipe inventory stock depletion.
+25. `dbo.sp_SettlePaymentAndCompleteOrder`: Atomic payment settlement, table status change, order completion.
+26. `dbo.sp_OpenCashRegisterShift`: Shift opening float initialization.
+27. `dbo.sp_CloseCashRegisterShift`: Shift closing float balancing and Z-report discrepancy calculation.
+28. `dbo.sp_CheckTableAvailability`: Reservation timeslot overlap conflict prevention.
+29. `dbo.sp_GetPublicPageWithSections`: Fast single-roundtrip retrieval for dynamic website pages.
+30. `dbo.sp_ReorderPageSections`: Drag-and-drop page section order update.
+31. `dbo.sp_SubmitContactMessage`: Inbound website contact message handling.
+
+#### 5.3 Restaurant & Floor Management (`database/08_RestaurantFloorStoredProcedures.sql`)
+32. `dbo.usp_Restaurant_Create`: Insert master restaurant profile with currency, timezone, and tax identifiers.
+33. `dbo.usp_Restaurant_Update`: Update restaurant profile, branding, contacts, and locale settings.
+34. `dbo.usp_Restaurant_GetById`: Fetch restaurant profile and associated active branches.
+35. `dbo.usp_Restaurant_List`: Paginated retrieval of restaurant enterprises with active branch counts.
+36. `dbo.usp_Restaurant_SetStatus`: Activate/deactivate restaurant entity.
+37. `dbo.usp_Branch_Create`: Register new branch outlet with operating hours, coordinates, and main branch logic.
+38. `dbo.usp_Branch_Update`: Update branch contact info, location coordinates, hours, and addresses.
+39. `dbo.usp_Branch_GetById`: Fetch branch details with restaurant parent metadata, sections, and table counts.
+40. `dbo.usp_Branch_List`: Filtered and paginated list of branches with operational metrics.
+41. `dbo.usp_Branch_SetStatus`: Activate/deactivate branch outlet.
+42. `dbo.usp_DiningSection_Create`: Create dining section (Main Dining, Terrace, Bar Lounge) for a branch.
+43. `dbo.usp_DiningSection_Update`: Update dining section name, floor level, and display sort order.
+44. `dbo.usp_DiningSection_GetById`: Fetch dining section details and table capacity metrics.
+45. `dbo.usp_DiningSection_ListByBranch`: Retrieve sections ordered by floor and display sequence with table counts.
+46. `dbo.usp_DiningSection_SetStatus`: Activate/deactivate dining section.
+47. `dbo.usp_DiningTable_Create`: Insert table with auto-generated unique QR Code hash and 2D canvas coordinates.
+48. `dbo.usp_DiningTable_Update`: Update table number, section assignment, seating capacity, and coordinates.
+49. `dbo.usp_DiningTable_GetById`: Fetch single table details with branch and section details.
+50. `dbo.usp_DiningTable_GetByQrHash`: High-speed unauthenticated table lookup for customer QR code ordering.
+51. `dbo.usp_DiningTable_ListByBranch`: Filter tables by section, status, and active state.
+52. `dbo.usp_DiningTable_ListBySection`: List all tables configured within a specific dining section.
+53. `dbo.usp_DiningTable_UpdateCapacity`: Adjust physical chair/seating capacity for a table.
+54. `dbo.usp_DiningTable_UpdateStatus`: Atomic status lifecycle update (AVAILABLE, OCCUPIED, RESERVED, BILLED, CLEANING) with ActiveOrderId tracking.
+55. `dbo.usp_DiningTable_GetAvailable`: High-speed lookup for vacant tables with optional minimum capacity filter.
+56. `dbo.usp_DiningTable_GetOccupied`: Retrieve occupied tables with linked active order references.
+57. `dbo.usp_DiningTable_Delete`: Safe soft deletion of dining tables (protects occupied/billed tables).
+58. `dbo.usp_Floor_GetLayout`: Multi-recordset 2D visual floor plan engine returning branch KPIs, sections, and tables with layout coordinates.
+
+
 

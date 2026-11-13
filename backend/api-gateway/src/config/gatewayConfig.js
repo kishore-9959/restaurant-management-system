@@ -31,6 +31,11 @@ const services = [
     name: 'restaurant-service',
   },
   {
+    prefix: '/api/v1/sections',
+    target: config.urls.restaurantService,
+    name: 'restaurant-service',
+  },
+  {
     prefix: '/api/v1/tables',
     target: config.urls.restaurantService,
     name: 'restaurant-service',

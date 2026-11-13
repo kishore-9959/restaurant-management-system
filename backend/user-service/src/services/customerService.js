@@ -2,43 +2,16 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - USER SERVICE
  * File: backend/user-service/src/services/customerService.js
+ * Description: Customer profile and address operations using stored procedures.
  * ============================================================================
  */
 
-const { User, CustomerAddress, sequelize } = require('../models');
+const userRepository = require('../repositories/user.repository');
+const customerAddressRepository = require('../repositories/customerAddress.repository');
 const { recordAudit } = require('./auditService');
 
-const USER_SAFE_ATTRIBUTES = [
-  'userId',
-  'branchId',
-  'firstName',
-  'lastName',
-  'email',
-  'phoneNumber',
-  'userType',
-  'avatarUrl',
-  'isActive',
-  'isEmailVerified',
-  'isPhoneVerified',
-  'lastLoginAt',
-  'createdAt',
-  'updatedAt',
-];
-
 async function getProfile(userId) {
-  const user = await User.findOne({
-    where: { userId, isDeleted: false },
-    attributes: USER_SAFE_ATTRIBUTES,
-    include: [
-      {
-        model: CustomerAddress,
-        as: 'addresses',
-        where: { isDeleted: false },
-        required: false,
-      },
-    ],
-  });
-
+  const user = await userRepository.getUserById(userId);
   if (!user) {
     const error = new Error('Customer profile not found.');
     error.statusCode = 404;
@@ -46,11 +19,15 @@ async function getProfile(userId) {
     throw error;
   }
 
-  return user;
+  const addresses = await customerAddressRepository.getAddressesByUserId(userId);
+  return {
+    ...user,
+    addresses,
+  };
 }
 
 async function updateProfile(userId, updateData, metadata = {}) {
-  const user = await User.findOne({ where: { userId, isDeleted: false } });
+  const user = await userRepository.getUserById(userId);
   if (!user) {
     const error = new Error('Customer profile not found.');
     error.statusCode = 404;
@@ -58,19 +35,12 @@ async function updateProfile(userId, updateData, metadata = {}) {
     throw error;
   }
 
-  const allowedFields = ['firstName', 'lastName', 'avatarUrl', 'phoneNumber'];
-  const oldValues = {};
-  const newValues = {};
-
-  allowedFields.forEach((field) => {
-    if (updateData[field] !== undefined) {
-      oldValues[field] = user[field];
-      user[field] = updateData[field];
-      newValues[field] = updateData[field];
-    }
+  const updatedUser = await userRepository.updateProfile(userId, {
+    firstName: updateData.firstName || user.firstName,
+    lastName: updateData.lastName !== undefined ? updateData.lastName : user.lastName,
+    phoneNumber: updateData.phoneNumber !== undefined ? updateData.phoneNumber : user.phoneNumber,
+    avatarUrl: updateData.avatarUrl !== undefined ? updateData.avatarUrl : user.avatarUrl,
   });
-
-  await user.save();
 
   await recordAudit({
     branchId: user.branchId,
@@ -78,226 +48,125 @@ async function updateProfile(userId, updateData, metadata = {}) {
     entityName: 'Users',
     entityId: userId,
     actionType: 'UPDATE_PROFILE',
-    actionDescription: `Customer updated profile fields: ${Object.keys(newValues).join(', ')}`,
+    actionDescription: `Customer updated profile`,
     ipAddress: metadata.ipAddress,
     userAgent: metadata.userAgent,
-    oldValues,
-    newValues,
+    oldValues: { firstName: user.firstName, lastName: user.lastName, phoneNumber: user.phoneNumber },
+    newValues: { firstName: updatedUser.firstName, lastName: updatedUser.lastName, phoneNumber: updatedUser.phoneNumber },
   });
 
   return getProfile(userId);
 }
 
 // ----------------------------------------------------------------------
-// CUSTOMER ADDRESS CRUD
+// CUSTOMER ADDRESS CRUD (Stored Procedure based)
 // ----------------------------------------------------------------------
 
 async function getAddresses(userId) {
-  return CustomerAddress.findAll({
-    where: { userId, isDeleted: false },
-    order: [
-      ['IsDefault', 'DESC'],
-      ['CreatedAt', 'DESC'],
-    ],
-  });
+  return customerAddressRepository.getAddressesByUserId(userId);
 }
 
-async function createAddress(userId, addressData, metadata = {}) {
-  const {
-    addressTitle = 'Home',
-    recipientName,
-    recipientPhone,
-    addressLine1,
-    addressLine2,
-    landmark,
-    city,
-    stateProvince,
-    postalCode,
-    latitude,
-    longitude,
-    isDefault = false,
-  } = addressData;
-
-  const t = await sequelize.transaction();
-  try {
-    // If this address is set as default, unset any existing default address
-    if (isDefault) {
-      await CustomerAddress.update(
-        { isDefault: false },
-        { where: { userId, isDeleted: false }, transaction: t }
-      );
-    } else {
-      // If user has no existing addresses, make the first one default automatically
-      const existingCount = await CustomerAddress.count({
-        where: { userId, isDeleted: false },
-        transaction: t,
-      });
-      if (existingCount === 0) {
-        addressData.isDefault = true;
-      }
-    }
-
-    const created = await CustomerAddress.create(
-      {
-        userId,
-        addressTitle,
-        recipientName,
-        recipientPhone,
-        addressLine1,
-        addressLine2,
-        landmark,
-        city,
-        stateProvince,
-        postalCode,
-        latitude,
-        longitude,
-        isDefault: addressData.isDefault !== undefined ? addressData.isDefault : isDefault,
-      },
-      { transaction: t }
-    );
-
-    await recordAudit({
-      userId,
-      entityName: 'CustomerAddresses',
-      entityId: created.addressId,
-      actionType: 'CREATE_ADDRESS',
-      actionDescription: `Created address '${addressTitle}' for user ${userId}`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      newValues: created.toJSON(),
-      transaction: t,
-    });
-
-    await t.commit();
-    return created;
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
-}
-
-async function updateAddress(userId, addressId, updateData, metadata = {}) {
-  const address = await CustomerAddress.findOne({
-    where: { addressId, userId, isDeleted: false },
+async function addAddress(userId, addressData, metadata = {}) {
+  const address = await customerAddressRepository.createAddress({
+    userId,
+    addressTitle: addressData.addressTitle || 'Home',
+    recipientName: addressData.recipientName,
+    recipientPhone: addressData.recipientPhone,
+    addressLine1: addressData.addressLine1,
+    addressLine2: addressData.addressLine2 || null,
+    landmark: addressData.landmark || null,
+    city: addressData.city,
+    stateProvince: addressData.stateProvince || addressData.state || 'Karnataka',
+    postalCode: addressData.postalCode,
+    latitude: addressData.latitude || null,
+    longitude: addressData.longitude || null,
+    isDefault: Boolean(addressData.isDefault),
   });
 
-  if (!address) {
-    const error = new Error('Address not found or does not belong to this user.');
+  await recordAudit({
+    userId,
+    entityName: 'CustomerAddresses',
+    entityId: address.addressId,
+    actionType: 'CREATE_ADDRESS',
+    actionDescription: `Added customer address: ${address.addressLine1}`,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+    newValues: address,
+  });
+
+  return address;
+}
+
+async function updateAddress(userId, addressId, addressData, metadata = {}) {
+  const existing = await customerAddressRepository.getAddressById(addressId, userId);
+  if (!existing) {
+    const error = new Error('Address not found or does not belong to user.');
     error.statusCode = 404;
     error.code = 'ADDRESS_NOT_FOUND';
     throw error;
   }
 
-  const t = await sequelize.transaction();
-  try {
-    if (updateData.isDefault === true && !address.isDefault) {
-      await CustomerAddress.update(
-        { isDefault: false },
-        { where: { userId, isDeleted: false }, transaction: t }
-      );
-    }
+  const updated = await customerAddressRepository.updateAddress(addressId, userId, {
+    addressTitle: addressData.addressTitle,
+    recipientName: addressData.recipientName,
+    recipientPhone: addressData.recipientPhone,
+    addressLine1: addressData.addressLine1,
+    addressLine2: addressData.addressLine2,
+    landmark: addressData.landmark,
+    city: addressData.city,
+    stateProvince: addressData.stateProvince || addressData.state,
+    postalCode: addressData.postalCode,
+    latitude: addressData.latitude,
+    longitude: addressData.longitude,
+    isDefault: addressData.isDefault,
+  });
 
-    const oldValues = address.toJSON();
-    Object.assign(address, updateData);
-    await address.save({ transaction: t });
+  await recordAudit({
+    userId,
+    entityName: 'CustomerAddresses',
+    entityId: addressId,
+    actionType: 'UPDATE_ADDRESS',
+    actionDescription: `Updated customer address ${addressId}`,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+    oldValues: existing,
+    newValues: updated,
+  });
 
-    await recordAudit({
-      userId,
-      entityName: 'CustomerAddresses',
-      entityId: addressId,
-      actionType: 'UPDATE_ADDRESS',
-      actionDescription: `Updated address ${addressId}`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      oldValues,
-      newValues: updateData,
-      transaction: t,
-    });
-
-    await t.commit();
-    return address;
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
+  return updated;
 }
 
 async function deleteAddress(userId, addressId, metadata = {}) {
-  const address = await CustomerAddress.findOne({
-    where: { addressId, userId, isDeleted: false },
-  });
-
-  if (!address) {
-    const error = new Error('Address not found or does not belong to this user.');
+  const existing = await customerAddressRepository.getAddressById(addressId, userId);
+  if (!existing) {
+    const error = new Error('Address not found or does not belong to user.');
     error.statusCode = 404;
     error.code = 'ADDRESS_NOT_FOUND';
     throw error;
   }
 
-  address.isDeleted = true;
-  address.deletedAt = new Date();
-  await address.save();
+  await customerAddressRepository.deleteAddress(addressId, userId);
 
   await recordAudit({
     userId,
     entityName: 'CustomerAddresses',
     entityId: addressId,
     actionType: 'DELETE_ADDRESS',
-    actionDescription: `Soft-deleted address ${addressId}`,
+    actionDescription: `Deleted customer address ${addressId}`,
     ipAddress: metadata.ipAddress,
     userAgent: metadata.userAgent,
+    oldValues: existing,
   });
 
-  return { message: 'Address deleted successfully.' };
-}
-
-async function setDefaultAddress(userId, addressId, metadata = {}) {
-  const address = await CustomerAddress.findOne({
-    where: { addressId, userId, isDeleted: false },
-  });
-
-  if (!address) {
-    const error = new Error('Address not found.');
-    error.statusCode = 404;
-    error.code = 'ADDRESS_NOT_FOUND';
-    throw error;
-  }
-
-  const t = await sequelize.transaction();
-  try {
-    await CustomerAddress.update(
-      { isDefault: false },
-      { where: { userId, isDeleted: false }, transaction: t }
-    );
-
-    address.isDefault = true;
-    await address.save({ transaction: t });
-
-    await recordAudit({
-      userId,
-      entityName: 'CustomerAddresses',
-      entityId: addressId,
-      actionType: 'SET_DEFAULT_ADDRESS',
-      actionDescription: `Set address ${addressId} as default`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      transaction: t,
-    });
-
-    await t.commit();
-    return address;
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
+  return { message: 'Address removed successfully.' };
 }
 
 module.exports = {
   getProfile,
   updateProfile,
   getAddresses,
-  createAddress,
+  addAddress,
+  createAddress: addAddress,
   updateAddress,
   deleteAddress,
-  setDefaultAddress,
 };

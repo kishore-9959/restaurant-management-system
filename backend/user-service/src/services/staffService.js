@@ -2,13 +2,14 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - USER SERVICE
  * File: backend/user-service/src/services/staffService.js
+ * Description: Staff and Employee management operations using stored procedure repositories.
  * ============================================================================
  */
 
-const { Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const { config, httpClient, createServiceLogger } = require('@rms/shared');
-const { User, Employee, sequelize } = require('../models');
+const userRepository = require('../repositories/user.repository');
+const employeeRepository = require('../repositories/employee.repository');
 const { recordAudit } = require('./auditService');
 
 const logger = createServiceLogger('user-staff-service');
@@ -19,29 +20,14 @@ const INTERNAL_HEADERS = {
   'Content-Type': 'application/json',
 };
 
-const USER_SAFE_ATTRS = [
-  'userId',
-  'firstName',
-  'lastName',
-  'email',
-  'phoneNumber',
-  'userType',
-  'avatarUrl',
-  'isActive',
-  'lastLoginAt',
-  'createdAt',
-];
-
 /**
  * Generate sequential EmployeeCode (e.g. EMP-BLR-005)
  */
 async function generateEmployeeCode(branchId = 1) {
   const branchPrefix = branchId === 1 ? 'BLR' : `B0${branchId}`;
-  const latestEmployee = await Employee.findOne({
-    order: [['EmployeeId', 'DESC']],
-  });
-
-  const nextSeq = latestEmployee ? parseInt(latestEmployee.employeeId, 10) + 1 : 1;
+  const employees = await employeeRepository.listEmployees({ limit: 100 });
+  const maxId = employees.reduce((max, e) => Math.max(max, Number(e.employeeId) || 0), 0);
+  const nextSeq = maxId + 1;
   const padded = String(nextSeq).padStart(3, '0');
   return `EMP-${branchPrefix}-${padded}`;
 }
@@ -72,70 +58,51 @@ async function createStaff(staffData, metadata = {}) {
 
   const employeeCode = staffData.employeeCode || (await generateEmployeeCode(branchId));
 
-  const t = await sequelize.transaction();
-  let createdUser;
-  let createdEmployee;
+  // 1. Create User via stored procedure repository
+  const createdUser = await userRepository.createUser({
+    firstName,
+    lastName,
+    email,
+    phoneNumber,
+    passwordHash,
+    passcodePin,
+    userType: 'STAFF',
+    branchId,
+    isActive: true,
+  });
 
-  try {
-    // 1. Create User
-    createdUser = await User.create(
-      {
-        branchId,
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        passwordHash,
-        passcodePin,
-        userType: 'STAFF',
-        isActive: true,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-      },
-      { transaction: t }
-    );
+  // 2. Create Employee via stored procedure repository
+  const createdEmployee = await employeeRepository.createEmployee({
+    userId: createdUser.userId,
+    branchId,
+    employeeCode,
+    designation,
+    dateOfJoining,
+    salary,
+    emergencyContactPerson,
+    emergencyContactPhone,
+    employmentStatus: 'ACTIVE',
+  });
 
-    // 2. Create Employee
-    createdEmployee = await Employee.create(
-      {
-        userId: createdUser.userId,
-        branchId,
-        employeeCode,
-        designation,
-        dateOfJoining,
-        salary,
-        emergencyContactPerson,
-        emergencyContactPhone,
-        employmentStatus: 'ACTIVE',
-      },
-      { transaction: t }
-    );
-
-    await recordAudit({
+  // 3. Record Audit log
+  await recordAudit({
+    branchId,
+    userId: metadata.currentUserId || createdUser.userId,
+    entityName: 'Employees',
+    entityId: createdEmployee.employeeId,
+    actionType: 'CREATE_STAFF',
+    actionDescription: `Created staff member ${employeeCode} (${designation})`,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+    newValues: {
+      userId: createdUser.userId,
+      employeeCode,
+      designation,
       branchId,
-      userId: metadata.currentUserId || createdUser.userId,
-      entityName: 'Employees',
-      entityId: createdEmployee.employeeId,
-      actionType: 'CREATE_STAFF',
-      actionDescription: `Created staff member ${employeeCode} (${designation})`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      newValues: {
-        userId: createdUser.userId,
-        employeeCode,
-        designation,
-        branchId,
-      },
-      transaction: t,
-    });
+    },
+  });
 
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
-
-  // 3. Assign Role via Auth Service internal endpoint
+  // 4. Assign Role via Auth Service internal endpoint
   try {
     await httpClient.post(
       `${AUTH_SERVICE_URL}/api/v1/auth/internal/assign-role`,
@@ -157,27 +124,13 @@ async function createStaff(staffData, metadata = {}) {
  * Get staff details by employeeId
  */
 async function getStaffById(employeeId) {
-  const employee = await Employee.findOne({
-    where: {
-      employeeId,
-      isDeleted: false,
-    },
-    include: [
-      {
-        model: User,
-        as: 'user',
-        attributes: USER_SAFE_ATTRS,
-      },
-    ],
-  });
-
+  const employee = await employeeRepository.getEmployeeById(employeeId);
   if (!employee) {
     const error = new Error('Staff member not found.');
     error.statusCode = 404;
     error.code = 'STAFF_NOT_FOUND';
     throw error;
   }
-
   return employee;
 }
 
@@ -185,76 +138,51 @@ async function getStaffById(employeeId) {
  * Update staff details
  */
 async function updateStaff(employeeId, updateData, metadata = {}) {
-  const employee = await Employee.findOne({
-    where: {
-      employeeId,
-      isDeleted: false,
-    },
-    include: [{ model: User, as: 'user' }],
-  });
-
-  if (!employee) {
+  const existing = await employeeRepository.getEmployeeById(employeeId);
+  if (!existing) {
     const error = new Error('Staff member not found.');
     error.statusCode = 404;
     error.code = 'STAFF_NOT_FOUND';
     throw error;
   }
 
-  const allowedEmployeeFields = [
-    'designation',
-    'salary',
-    'dateOfLeaving',
-    'emergencyContactPerson',
-    'emergencyContactPhone',
-    'branchId',
-    'employmentStatus',
-  ];
-
-  const oldValues = employee.toJSON();
-  allowedEmployeeFields.forEach((field) => {
-    if (updateData[field] !== undefined) {
-      employee[field] = updateData[field];
-    }
+  const updatedEmployee = await employeeRepository.updateEmployee(employeeId, {
+    designation: updateData.designation,
+    salary: updateData.salary,
+    dateOfJoining: updateData.dateOfJoining,
+    emergencyContactPerson: updateData.emergencyContactPerson,
+    emergencyContactPhone: updateData.emergencyContactPhone,
   });
 
-  // If name or phone is passed, update user record too
-  if (updateData.firstName) employee.user.firstName = updateData.firstName;
-  if (updateData.lastName) employee.user.lastName = updateData.lastName;
-  if (updateData.phoneNumber) employee.user.phoneNumber = updateData.phoneNumber;
-
-  const t = await sequelize.transaction();
-  try {
-    await employee.save({ transaction: t });
-    await employee.user.save({ transaction: t });
-
-    await recordAudit({
-      branchId: employee.branchId,
-      userId: metadata.currentUserId,
-      entityName: 'Employees',
-      entityId: employee.employeeId,
-      actionType: 'UPDATE_STAFF',
-      actionDescription: `Updated staff details for ${employee.employeeCode}`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      oldValues,
-      newValues: updateData,
-      transaction: t,
+  if (updateData.firstName || updateData.lastName || updateData.phoneNumber) {
+    await userRepository.updateProfile(existing.userId, {
+      firstName: updateData.firstName || existing.user?.firstName,
+      lastName: updateData.lastName || existing.user?.lastName,
+      phoneNumber: updateData.phoneNumber || existing.user?.phoneNumber,
     });
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
   }
 
-  return getStaffById(employee.employeeId);
+  await recordAudit({
+    branchId: existing.branchId,
+    userId: metadata.currentUserId,
+    entityName: 'Employees',
+    entityId: employeeId,
+    actionType: 'UPDATE_STAFF',
+    actionDescription: `Updated staff details for ${existing.employeeCode}`,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+    oldValues: existing,
+    newValues: updateData,
+  });
+
+  return getStaffById(employeeId);
 }
 
 /**
  * Toggle staff employment status (ACTIVE, TERMINATED, ON_LEAVE)
  */
 async function updateStaffStatus(employeeId, status, metadata = {}) {
-  const validStatuses = ['ACTIVE', 'ON_LEAVE', 'TERMINATED', 'RESIGNED'];
+  const validStatuses = ['ACTIVE', 'ON_LEAVE', 'TERMINATED', 'RESIGNED', 'INACTIVE'];
   if (!validStatuses.includes(status)) {
     const error = new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     error.statusCode = 400;
@@ -262,58 +190,30 @@ async function updateStaffStatus(employeeId, status, metadata = {}) {
     throw error;
   }
 
-  const employee = await Employee.findOne({
-    where: {
-      employeeId,
-      isDeleted: false,
-    },
-    include: [{ model: User, as: 'user' }],
-  });
-
-  if (!employee) {
+  const existing = await employeeRepository.getEmployeeById(employeeId);
+  if (!existing) {
     const error = new Error('Staff member not found.');
     error.statusCode = 404;
     error.code = 'STAFF_NOT_FOUND';
     throw error;
   }
 
-  const oldStatus = employee.employmentStatus;
-  employee.employmentStatus = status;
+  const updated = await employeeRepository.updateStatus(employeeId, status);
 
-  // Sync user active state
-  if (status === 'TERMINATED' || status === 'RESIGNED') {
-    employee.user.isActive = false;
-    employee.dateOfLeaving = new Date().toISOString().split('T')[0];
-  } else if (status === 'ACTIVE') {
-    employee.user.isActive = true;
-  }
+  await recordAudit({
+    branchId: existing.branchId,
+    userId: metadata.currentUserId,
+    entityName: 'Employees',
+    entityId: employeeId,
+    actionType: 'STATUS_CHANGE',
+    actionDescription: `Changed staff ${existing.employeeCode} status from ${existing.employmentStatus} to ${status}`,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+    oldValues: { employmentStatus: existing.employmentStatus },
+    newValues: { employmentStatus: status },
+  });
 
-  const t = await sequelize.transaction();
-  try {
-    await employee.save({ transaction: t });
-    await employee.user.save({ transaction: t });
-
-    await recordAudit({
-      branchId: employee.branchId,
-      userId: metadata.currentUserId,
-      entityName: 'Employees',
-      entityId: employee.employeeId,
-      actionType: 'STATUS_CHANGE',
-      actionDescription: `Changed staff ${employee.employeeCode} status from ${oldStatus} to ${status}`,
-      ipAddress: metadata.ipAddress,
-      userAgent: metadata.userAgent,
-      oldValues: { employmentStatus: oldStatus },
-      newValues: { employmentStatus: status },
-      transaction: t,
-    });
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
-
-  return getStaffById(employee.employeeId);
+  return updated;
 }
 
 /**
@@ -321,47 +221,22 @@ async function updateStaffStatus(employeeId, status, metadata = {}) {
  */
 async function listStaff({ page = 1, limit = 20, branchId, designation, status, search }) {
   const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
-  const where = { isDeleted: false };
-  const userWhere = { isDeleted: false };
-
-  if (branchId) {
-    where.branchId = parseInt(branchId, 10);
-  }
-  if (designation) {
-    where.designation = designation;
-  }
-  if (status) {
-    where.employmentStatus = status;
-  }
-  if (search) {
-    where[Op.or] = [
-      { employeeCode: { [Op.like]: `%${search}%` } },
-      { designation: { [Op.like]: `%${search}%` } },
-    ];
-  }
-
-  const { count, rows } = await Employee.findAndCountAll({
-    where,
-    include: [
-      {
-        model: User,
-        as: 'user',
-        where: userWhere,
-        attributes: USER_SAFE_ATTRS,
-      },
-    ],
+  const staff = await employeeRepository.listEmployees({
+    branchId,
+    designation,
+    employmentStatus: status,
+    searchTerm: search,
     limit: parseInt(limit, 10),
     offset,
-    order: [['EmployeeId', 'ASC']],
   });
 
   return {
-    staff: rows,
+    staff,
     pagination: {
-      total: count,
+      total: staff.length,
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
-      totalPages: Math.ceil(count / parseInt(limit, 10)),
+      totalPages: 1,
     },
   };
 }

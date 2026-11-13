@@ -5,10 +5,10 @@
 
 ### Project Status Overview
 
-- **Architecture Model**: **Microservices Architecture Only (14 Microservices, API Gateway, Redis, Socket.IO, Shared MSSQL Database)**
-- **Current Milestone**: Phase 3 Infrastructure & Project Scaffolding Complete
-- **Status**: **Phase 3 Complete (Ready for User Review before Phase 4 Auth Service)**
-- **Next Milestone**: Phase 4 — Auth Service & User Service (JWT, RBAC, Profiles, PIN Login)
+- **Architecture Model**: **Microservices Architecture Only (14 Microservices, API Gateway, Redis, Socket.IO, Shared MSSQL Database, 100% Stored Procedures, Zero ORM)**
+- **Current Milestone**: Phase 5 Restaurant Service & Floor Management Complete
+- **Status**: **Phase 5 Complete (Ready for User Review before Phase 6 Menu Service)**
+- **Next Milestone**: Phase 6 — Menu Service & Redis Catalog Caching ("86" Toggle)
 - **Lead Architect**: Senior Microservices Architect & Full-Stack Lead
 
 ---
@@ -19,9 +19,10 @@
 | :---: | :--- | :---: | :---: | :---: |
 | **Phase 1** | Requirements & Domain Modeling | **COMPLETED** | **2026-11-08** | **Approved by User** |
 | **Phase 2** | Database Architecture, 55 Tables, Indexes & Stored Procedures | **COMPLETED** | **2026-11-08** | **Executed by User** |
-| **Phase 3** | Project Scaffold, Global .env, Docker Compose & API Gateway | **COMPLETED** | **2026-11-08** | **Awaiting User Review** |
-| **Phase 4** | Auth Service & User Service (JWT, RBAC, Profiles, PIN Login) | *Planned* | - | Pending |
-| **Phase 5** | Restaurant Service & Floor Management (Branches, Tables, Shifts) | *Planned* | - | Pending |
+| **Phase 3** | Project Scaffold, Global .env, Docker Compose & API Gateway | **COMPLETED** | **2026-11-08** | **Approved by User** |
+| **Phase 4** | Auth Service & User Service (JWT, RBAC, Profiles, PIN Login) | **COMPLETED** | **2026-11-10** | **Passed 20/20 Tests** |
+| **Refactor**| Architecture Refactoring (Stored Procedures ONLY, Global DB Config) | **COMPLETED** | **2026-11-12** | **Approved by User** |
+| **Phase 5** | Restaurant Service & Floor Management (Branches, Tables, Shifts) | **COMPLETED** | **2026-11-12** | **Passed 24/24 Tests** |
 | **Phase 6** | Menu Service & Redis Catalog Caching ("86" Toggle) | *Planned* | - | Pending |
 | **Phase 7** | Dynamic Website CMS Service & Public Customer Frontend | *Planned* | - | Pending |
 | **Phase 8** | Cart Service & Order Service (Orchestrated Saga Engine) | *Planned* | - | Pending |
@@ -185,24 +186,36 @@
 
 ---
 
-## Phase 4 – Authentication & User Service Implementation (Completed)
+## Phase 4 & Architecture Refactoring – Stored Procedures & Global DB Configuration (Completed)
 
-**Status:** **PHASE 4 COMPLETE – ALL 20 TEST REQUIREMENTS PASSED (100% SUCCESS)**  
-**Verification Date:** November 10, 2026  
+**Status:** **PHASE 4 & REFACTORING COMPLETE – 100% STORED PROCEDURES, ALL 20 TESTS PASSED**  
+**Verification Date:** November 12, 2026  
 **Active Test Runner:** `scripts/test_phase4.js`  
+**Microservices Dual-Probe Audit:** `scripts/verify_all_services_startup.js` (14/14 Services Healthy)  
+**Database Stored Procedures:** `database/07_AuthUserStoredProcedures.sql` (23 Stored Procedures Deployed)  
 **API Documentation:** [`RMS_Phase4_API_Documentation.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase4_API_Documentation.md)  
 **Security Implementation Report:** [`RMS_Phase4_Security_Report.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase4_Security_Report.md)  
 **Postman Collection:** [`RMS_Phase4_Auth_User_Collection.json`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/postman/RMS_Phase4_Auth_User_Collection.json)  
 
-### 1. Database Table Ownership & Sequelize Mapping
+### 1. Database Table Ownership & Stored Procedures Mapping (Zero ORM)
 
-| Microservice | Port | Owned Database Tables | Sequelize Models | Schema Constraints Verified |
+| Microservice | Port | Owned Database Tables | Database Access Implementation | Stored Procedures Mapped |
 | :--- | :---: | :--- | :--- | :--- |
-| **`auth-service`** | **8001** | `dbo.Roles`<br>`dbo.Permissions`<br>`dbo.RolePermissions`<br>`dbo.UserRoles` | `Role.js`<br>`Permission.js`<br>`RolePermission.js`<br>`UserRole.js` | Primary Keys, Foreign Keys, Unique constraints mapped to existing SQL Server tables. Zero table alterations or data migrations. |
-| **`user-service`** | **8002** | `dbo.Users`<br>`dbo.Employees`<br>`dbo.CustomerAddresses`<br>`dbo.AuditLogs` | `User.js`<br>`Employee.js`<br>`CustomerAddress.js`<br>`AuditLog.js` | Zero sensitive credentials (`PasswordHash`, `PasscodePin`) exposed. Default address toggle managed via atomic Sequelize transactions. |
-| **`api-gateway`** | **8000** | Reverse Proxy Ingress Router | N/A | Centralized JWT validation, Redis revocation checks, caller header decoration (`X-User-ID`, `X-User-Role`, `X-Branch-ID`). |
+| **`auth-service`** | **8001** | `dbo.Roles`<br>`dbo.Permissions`<br>`dbo.RolePermissions`<br>`dbo.UserRoles` | `auth.repository.js` -> `executeProcedure()` via `@rms/shared` | `usp_Auth_GetUserRolesAndPermissions`<br>`usp_Auth_AssignRole`<br>`usp_Auth_GetAllRoles` |
+| **`user-service`** | **8002** | `dbo.Users`<br>`dbo.Employees`<br>`dbo.CustomerAddresses`<br>`dbo.AuditLogs` | `user.repository.js`<br>`customerAddress.repository.js`<br>`employee.repository.js`<br>`audit.repository.js` | `usp_User_GetByEmailOrPhone`<br>`usp_User_GetById`<br>`usp_User_Create`<br>`usp_User_CheckExists`<br>`usp_User_UpdateProfile`<br>`usp_User_UpdateLastLogin`<br>`usp_User_SetStatus`<br>`usp_User_GetPinAuth`<br>`usp_CustomerAddress_Create`<br>`usp_CustomerAddress_GetByUserId`<br>`usp_CustomerAddress_GetById`<br>`usp_CustomerAddress_Update`<br>`usp_CustomerAddress_Delete`<br>`usp_Employee_Create`<br>`usp_Employee_GetById`<br>`usp_Employee_GetByUserId`<br>`usp_Employee_List`<br>`usp_Employee_Update`<br>`usp_Employee_UpdateStatus`<br>`usp_AuditLog_Create` |
+| **`api-gateway`** | **8000** | Reverse Proxy Ingress Router | N/A | Centralized JWT validation, Redis token blacklist checks, caller header decoration (`X-User-ID`, `X-User-Role`, `X-Branch-ID`). |
 
-### 2. Comprehensive Automated Verification Test Results (20/20 Passed)
+### 2. Microservice Layered Architecture Standard (All 14 Services)
+
+Every microservice strictly follows the standard 4-tier clean architecture:
+`HTTP Request -> Routes -> Controller -> Service -> Repository -> executeProcedure() -> SQL Server Stored Procedure`
+
+Standardized directory structure enforced across all 14 services:
+`src/controllers/`, `src/services/`, `src/repositories/`, `src/routes/`, `src/middleware/`, `src/validators/`, `src/utils/`, `src/app.js`, `src/index.js`, `package.json`.
+
+All Sequelize models and ORM dependencies (`sequelize`, `tedious` inside service packages) have been removed. Database connectivity is managed exclusively by the singleton connection pool in `backend/shared/config/database.js` (`mssql` package).
+
+### 3. Comprehensive Automated Verification Test Results (20/20 Passed via Stored Procedures)
 
 ```
 ================================================================
@@ -259,12 +272,97 @@
 🎉 ALL 20 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
 ```
 
+### 4. Microservices Dual-Probe Health Audit (14/14 UP)
+
+Verified via `scripts/verify_all_services_startup.js`:
+- `api-gateway` (:8000): **Live: UP (200)** | **Ready: UP (200)** (Redis Healthy)
+- `auth-service` (:8001): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `user-service` (:8002): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `restaurant-service` (:8003): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `cms-service` (:8004): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy, Redis Healthy)
+- `menu-service` (:8005): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy, Redis Healthy)
+- `cart-service` (:8006): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy, Redis Healthy)
+- `order-service` (:8007): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `payment-service` (:8008): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `inventory-service` (:8009): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `kitchen-service` (:8010): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `reservation-service` (:8011): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `notification-service` (:8012): **Live: UP (200)** | **Ready: UP (200)** (DB Healthy)
+- `report-service` (:8013): **Live: UP (200)** | **Ready: UP (200)** (Stateless Aggregator)
+
 ---
 
-### Phase 4 Scope Boundaries Observed
-- Zero modifications made to `database/*.sql` scripts or pre-existing seed data.
-- Never called `sequelize.sync({ alter: true })` or `sequelize.sync({ force: true })`.
+### Architectural Boundaries Observed
+- Zero modifications made to `database/01` through `06` SQL scripts or pre-existing seed data.
+- Completely removed all Sequelize ORM dependencies, models, and files.
+- Pure Stored Procedures execution for all SQL Server database operations.
+- Single global database pool in `backend/shared/config/database.js` and single root `.env`.
+- Standardized directory structure across all 14 microservices.
 - No cross-service direct table queries; mutual REST integration with `X-Internal-Service-Key` used exclusively.
-- All configurations strictly read from the single root `.env` file.
-- Phase 5 (Restaurant Service & Floor Management) has **not** been started. Awaiting user review and sign-off.
+
+---
+
+## Phase 5 – Restaurant Service & Floor Management (Completed)
+
+**Status:** **PHASE 5 COMPLETE – ALL 24 TEST REQUIREMENTS PASSED (100% SUCCESS)**  
+**Verification Date:** November 12, 2026  
+**Active Test Runner:** `scripts/test_phase5.js`  
+**Microservices Dual-Probe Audit:** `scripts/verify_all_services_startup.js` (14/14 Services Healthy)  
+**Database Stored Procedures:** `database/08_RestaurantFloorStoredProcedures.sql` (27 Stored Procedures Deployed)  
+**API Documentation:** [`RMS_Phase5_API_Documentation.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase5_API_Documentation.md)  
+
+### 1. Database Table Ownership & Stored Procedures Mapping (Zero ORM)
+
+| Microservice | Port | Owned Database Tables | Database Access Implementation | Stored Procedures Mapped |
+| :--- | :---: | :--- | :--- | :--- |
+| **`restaurant-service`** | **8003** | `dbo.Restaurants`<br>`dbo.Branches`<br>`dbo.DiningSections`<br>`dbo.RestaurantTables` | `restaurant.repository.js`<br>`branch.repository.js`<br>`diningSection.repository.js`<br>`diningTable.repository.js` | `usp_Restaurant_Create`<br>`usp_Restaurant_Update`<br>`usp_Restaurant_GetById`<br>`usp_Restaurant_List`<br>`usp_Restaurant_SetStatus`<br>`usp_Branch_Create`<br>`usp_Branch_Update`<br>`usp_Branch_GetById`<br>`usp_Branch_List`<br>`usp_Branch_SetStatus`<br>`usp_DiningSection_Create`<br>`usp_DiningSection_Update`<br>`usp_DiningSection_GetById`<br>`usp_DiningSection_ListByBranch`<br>`usp_DiningSection_SetStatus`<br>`usp_DiningTable_Create`<br>`usp_DiningTable_Update`<br>`usp_DiningTable_GetById`<br>`usp_DiningTable_GetByQrHash`<br>`usp_DiningTable_ListByBranch`<br>`usp_DiningTable_ListBySection`<br>`usp_DiningTable_UpdateCapacity`<br>`usp_DiningTable_UpdateStatus`<br>`usp_DiningTable_GetAvailable`<br>`usp_DiningTable_GetOccupied`<br>`usp_DiningTable_Delete`<br>`usp_Floor_GetLayout`<br>`sp_CheckTableAvailability` |
+| **`api-gateway`** | **8000** | Reverse Proxy Ingress Router | N/A | Ingress routes mounted: `/api/v1/restaurants`, `/api/v1/branches`, `/api/v1/sections`, `/api/v1/tables`, `/api/v1/shifts`. Public whitelist: `/api/v1/tables/qr/:hash`. |
+
+### 2. Comprehensive Automated Verification Test Results (24/24 Passed via Stored Procedures)
+
+```
+================================================================
+  RMS PHASE 5: RESTAURANT SERVICE & FLOOR MANAGEMENT SUITE
+================================================================
+[✅ PASS] Test 01: Service Health Liveness probe
+[✅ PASS] Test 02: Service Readiness probe & DB connectivity
+[✅ PASS] Test 03: Unauthorized access rejection (Missing Token -> 401)
+[✅ PASS] Test 04: Role-based access rejection (Customer Token -> 403)
+[✅ PASS] Test 05: Invalid restaurant input handling (Validation Error -> 400)
+[✅ PASS] Test 06: Invalid branch input handling (Validation Error -> 400)
+[✅ PASS] Test 07: Invalid table status rejection (Validation Error -> 400)
+[✅ PASS] Test 08: Existing seed restaurant verification (Antigravity Gourmet Bistro)
+[✅ PASS] Test 09: Existing seed branch & sections verification (Indiranagar Flagship, 3 sections)
+[✅ PASS] Test 10: Existing seed tables verification (8 tables T-01 to BAR-02)
+[✅ PASS] Test 11: Restaurant CRUD - Create restaurant (201 Created)
+[✅ PASS] Test 12: Restaurant CRUD - Update & status toggle (200 OK)
+[✅ PASS] Test 13: Restaurant CRUD - List with pagination (200 OK)
+[✅ PASS] Test 14: Branch CRUD - Create branch (201 Created)
+[✅ PASS] Test 15: Branch CRUD - Update & status toggle (200 OK)
+[✅ PASS] Test 16: Dining Section CRUD (Create, Update, List) (201 & 200 OK)
+[✅ PASS] Test 17: Dining Table CRUD - Create table with QR Code (201 Created)
+[✅ PASS] Test 18: Dining Table CRUD - Update details & capacity (200 OK)
+[✅ PASS] Test 19: Table availability & capacity filtering (200 OK)
+[✅ PASS] Test 20: Table status lifecycle transitions (AVAILABLE -> OCCUPIED -> BILLED -> CLEANING -> AVAILABLE)
+[✅ PASS] Test 21: Customer public QR table scan (Unauthenticated 200 OK)
+[✅ PASS] Test 22: Floor Management & 2D visual floor plan (KPIs + Sections + Coordinates)
+[✅ PASS] Test 23: Dining table soft deletion (200 OK, soft-deleted)
+[✅ PASS] Test 24: Direct microservice port 8003 execution (200 OK)
+================================================================
+  TEST SUMMARY: 24 Passed / 0 Failed (100% Success Rate)
+================================================================
+🎉 ALL 24 PHASE 5 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
+```
+
+---
+
+### Phase 5 Scope Boundaries Observed
+- Zero modifications made to `database/01` through `07` SQL scripts or pre-existing seed data.
+- Pure Stored Procedures execution for all SQL Server database operations.
+- Single global database pool in `backend/shared/config/database.js` and single root `.env`.
+- No Sequelize ORM or models used.
+- Real-time notification integration via internal HTTP broadcast to `notification-service`.
+- Phase 6 (Menu Service & Redis Catalog Caching) has **not** been started. Awaiting user review and sign-off.
+
+
 

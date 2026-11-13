@@ -8,7 +8,7 @@
 
 const http = require('http');
 const jwt = require('jsonwebtoken');
-const { config, sequelize, redisClient } = require('../backend/shared');
+const { config, redisClient } = require('../backend/shared');
 
 const GATEWAY_URL = 'http://localhost:8000';
 const AUTH_URL = 'http://localhost:8001';

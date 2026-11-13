@@ -2,46 +2,28 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - USER SERVICE
  * File: backend/user-service/src/controllers/internalUserController.js
+ * Description: Internal inter-service endpoints powered by stored procedures.
  * ============================================================================
  */
 
-const { Op } = require('sequelize');
 const { successResponse, errorResponse } = require('@rms/shared');
-const { User, Employee } = require('../models');
+const userRepository = require('../repositories/user.repository');
+const employeeRepository = require('../repositories/employee.repository');
 
 async function createUser(req, res) {
   try {
     const { firstName, lastName, email, phoneNumber, passwordHash, passcodePin, userType, branchId } = req.body;
 
-    // Check for duplicate email if provided
-    if (email) {
-      const existingEmail = await User.findOne({
-        where: { email, isDeleted: false },
-      });
-      if (existingEmail) {
-        return errorResponse(res, {
-          statusCode: 409,
-          code: 'EMAIL_ALREADY_EXISTS',
-          message: `A user with email '${email}' already exists.`,
-        });
-      }
+    // Check uniqueness via stored procedure
+    const exists = await userRepository.checkExists(email, phoneNumber);
+    if (exists.emailExists) {
+      return errorResponse(res, 409, 'EMAIL_ALREADY_EXISTS', `A user with email '${email}' already exists.`);
+    }
+    if (exists.phoneExists) {
+      return errorResponse(res, 409, 'PHONE_ALREADY_EXISTS', `A user with phone number '${phoneNumber}' already exists.`);
     }
 
-    // Check for duplicate phone
-    if (phoneNumber) {
-      const existingPhone = await User.findOne({
-        where: { phoneNumber, isDeleted: false },
-      });
-      if (existingPhone) {
-        return errorResponse(res, {
-          statusCode: 409,
-          code: 'PHONE_ALREADY_EXISTS',
-          message: `A user with phone number '${phoneNumber}' already exists.`,
-        });
-      }
-    }
-
-    const newUser = await User.create({
+    const newUser = await userRepository.createUser({
       firstName,
       lastName,
       email: email || null,
@@ -51,30 +33,15 @@ async function createUser(req, res) {
       userType: userType || 'CUSTOMER',
       branchId: branchId || null,
       isActive: true,
-      isEmailVerified: false,
-      isPhoneVerified: false,
     });
 
     return successResponse(res, {
       statusCode: 201,
       message: 'User created successfully.',
-      data: {
-        userId: newUser.userId,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        phoneNumber: newUser.phoneNumber,
-        userType: newUser.userType,
-        branchId: newUser.branchId,
-        isActive: newUser.isActive,
-      },
+      data: newUser,
     });
   } catch (err) {
-    return errorResponse(res, {
-      statusCode: 500,
-      code: 'CREATE_USER_ERROR',
-      message: err.message,
-    });
+    return errorResponse(res, 500, 'CREATE_USER_ERROR', err.message);
   }
 }
 
@@ -84,48 +51,21 @@ async function lookupUser(req, res) {
 
     let user = null;
     if (userId) {
-      user = await User.findOne({
-        where: { userId, isDeleted: false },
-      });
+      user = await userRepository.getUserById(userId);
     } else if (credential) {
-      user = await User.findOne({
-        where: {
-          [Op.or]: [{ email: credential }, { phoneNumber: credential }],
-          isDeleted: false,
-        },
-      });
+      user = await userRepository.getUserByEmailOrPhone(credential);
     }
 
     if (!user) {
-      return errorResponse(res, {
-        statusCode: 404,
-        code: 'USER_NOT_FOUND',
-        message: 'No active user found matching the given credential.',
-      });
+      return errorResponse(res, 404, 'USER_NOT_FOUND', 'No active user found matching the given credential.');
     }
 
     return successResponse(res, {
       statusCode: 200,
-      data: {
-        userId: user.userId,
-        branchId: user.branchId,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        passwordHash: user.passwordHash,
-        passcodePin: user.passcodePin,
-        userType: user.userType,
-        isActive: user.isActive,
-        lastLoginAt: user.lastLoginAt,
-      },
+      data: user,
     });
   } catch (err) {
-    return errorResponse(res, {
-      statusCode: 500,
-      code: 'USER_LOOKUP_ERROR',
-      message: err.message,
-    });
+    return errorResponse(res, 500, 'USER_LOOKUP_ERROR', err.message);
   }
 }
 
@@ -133,79 +73,44 @@ async function lookupEmployee(req, res) {
   try {
     const { employeeCode } = req.body;
     if (!employeeCode) {
-      return errorResponse(res, {
-        statusCode: 400,
-        code: 'MISSING_EMPLOYEE_CODE',
-        message: 'employeeCode is required.',
-      });
+      return errorResponse(res, 400, 'MISSING_EMPLOYEE_CODE', 'employeeCode is required.');
     }
 
-    const employee = await Employee.findOne({
-      where: { employeeCode, isDeleted: false },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          where: { isDeleted: false },
-        },
-      ],
+    const employees = await employeeRepository.listEmployees({
+      searchTerm: employeeCode,
+      limit: 10,
     });
 
+    const employee = employees.find(e => e.employeeCode === employeeCode);
     if (!employee) {
-      return errorResponse(res, {
-        statusCode: 404,
-        code: 'EMPLOYEE_NOT_FOUND',
-        message: `Employee '${employeeCode}' not found.`,
-      });
+      return errorResponse(res, 404, 'EMPLOYEE_NOT_FOUND', `Employee '${employeeCode}' not found.`);
+    }
+
+    // Include passcodePin from User for POS PIN verification
+    const pinAuth = await userRepository.getPinAuth(employee.userId);
+    if (employee.user && pinAuth) {
+      employee.user.passcodePin = pinAuth.passcodePin;
     }
 
     return successResponse(res, {
       statusCode: 200,
-      data: {
-        employeeId: employee.employeeId,
-        employeeCode: employee.employeeCode,
-        designation: employee.designation,
-        branchId: employee.branchId,
-        employmentStatus: employee.employmentStatus,
-        userId: employee.userId,
-        user: {
-          userId: employee.user.userId,
-          firstName: employee.user.firstName,
-          lastName: employee.user.lastName,
-          email: employee.user.email,
-          phoneNumber: employee.user.phoneNumber,
-          passcodePin: employee.user.passcodePin,
-          userType: employee.user.userType,
-          isActive: employee.user.isActive,
-        },
-      },
+      data: employee,
     });
   } catch (err) {
-    return errorResponse(res, {
-      statusCode: 500,
-      code: 'EMPLOYEE_LOOKUP_ERROR',
-      message: err.message,
-    });
+    return errorResponse(res, 500, 'EMPLOYEE_LOOKUP_ERROR', err.message);
   }
 }
 
 async function updateLastLogin(req, res) {
   try {
     const { id } = req.params;
-    await User.update(
-      { lastLoginAt: new Date() },
-      { where: { userId: id } }
-    );
+    await userRepository.updateLastLogin(id);
     return successResponse(res, {
       statusCode: 200,
       message: 'Last login updated.',
     });
   } catch (err) {
-    return errorResponse(res, {
-      statusCode: 500,
-      code: 'UPDATE_LOGIN_ERROR',
-      message: err.message,
-    });
+    return errorResponse(res, 500, 'UPDATE_LOGIN_ERROR', err.message);
   }
 }
 
@@ -215,4 +120,3 @@ module.exports = {
   lookupEmployee,
   updateLastLogin,
 };
-

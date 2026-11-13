@@ -2,11 +2,13 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - AUTH SERVICE
  * File: backend/auth-service/src/services/authService.js
+ * Description: Business logic for authentication, login, registration, and sessions,
+ *              using stored-procedure repository access.
  * ============================================================================
  */
 
 const { config, httpClient, createServiceLogger } = require('@rms/shared');
-const { Role, Permission, UserRole, sequelize } = require('../models');
+const authRepository = require('../repositories/auth.repository');
 const { hashPassword, comparePassword } = require('../utils/passwordService');
 const { generateTokenPair, rotateRefreshToken, revokeTokens } = require('./tokenService');
 const { verifyPinAttempt } = require('./pinService');
@@ -20,47 +22,10 @@ const INTERNAL_HEADERS = {
 };
 
 /**
- * Fetch roles and permissions for a user from Auth Service's DB
+ * Fetch roles and permissions for a user via stored procedure
  */
 async function getUserRolesAndPermissions(userId) {
-  const userRoles = await UserRole.findAll({
-    where: { userId },
-    include: [
-      {
-        model: Role,
-        as: 'role',
-        include: [
-          {
-            model: Permission,
-            as: 'permissions',
-            through: { attributes: [] },
-          },
-        ],
-      },
-    ],
-  });
-
-  const roles = [];
-  const permissionsSet = new Set();
-  let branchId = null;
-
-  userRoles.forEach((ur) => {
-    if (ur.role) {
-      roles.push(ur.role.roleCode);
-      if (ur.role.permissions) {
-        ur.role.permissions.forEach((p) => permissionsSet.add(p.permissionCode));
-      }
-    }
-    if (ur.branchId && !branchId) {
-      branchId = ur.branchId;
-    }
-  });
-
-  return {
-    roles,
-    permissions: Array.from(permissionsSet),
-    branchId,
-  };
+  return authRepository.getUserRolesAndPermissions(userId);
 }
 
 /**
@@ -97,18 +62,11 @@ async function registerCustomer(data) {
     throw error;
   }
 
-  // 2. Assign CUSTOMER role in UserRoles table
+  // 2. Assign CUSTOMER role via stored procedure repository
   try {
-    const customerRole = await Role.findOne({ where: { roleCode: 'CUSTOMER' } });
-    if (customerRole) {
-      await UserRole.create({
-        userId: createdUser.userId,
-        roleId: customerRole.roleId,
-        branchId: createdUser.branchId || null,
-      });
-    }
+    await authRepository.assignRole(createdUser.userId, 'CUSTOMER', createdUser.branchId || null);
   } catch (err) {
-    logger.error('Failed to assign CUSTOMER role in UserRoles:', err.message);
+    logger.error('Failed to assign CUSTOMER role via repository:', err.message);
   }
 
   // 3. Issue Token Pair

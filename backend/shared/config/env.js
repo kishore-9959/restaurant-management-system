@@ -51,7 +51,7 @@ const config = {
     port: parseInt(process.env.DB_PORT, 10) || 1435,
     database: process.env.DB_NAME || 'RestaurantManagementDB',
     user: process.env.DB_USER || 'sa',
-    password: process.env.DB_PASSWORD || 'YourStrong!Passw0rd',
+    password: process.env.DB_PASSWORD || 'Pass@123',
     dialect: process.env.DB_DIALECT || 'mssql',
     pool: {
       max: parseInt(process.env.DB_POOL_MAX, 10) || 20,

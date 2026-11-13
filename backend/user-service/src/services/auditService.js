@@ -2,10 +2,11 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - USER SERVICE
  * File: backend/user-service/src/services/auditService.js
+ * Description: Audit logging service using stored procedure repository.
  * ============================================================================
  */
 
-const { AuditLog } = require('../models');
+const auditRepository = require('../repositories/audit.repository');
 const { createServiceLogger } = require('@rms/shared');
 
 const logger = createServiceLogger('user-audit-service');
@@ -21,30 +22,25 @@ async function recordAudit({
   userAgent = null,
   oldValues = null,
   newValues = null,
-  transaction = null,
 }) {
   try {
-    await AuditLog.create(
-      {
-        branchId,
-        userId,
-        entityName,
-        entityId: String(entityId),
-        actionType,
-        actionDescription,
-        ipAddress,
-        userAgent,
-        oldValuesJson: oldValues ? JSON.stringify(oldValues) : null,
-        newValuesJson: newValues ? JSON.stringify(newValues) : null,
-      },
-      { transaction }
-    );
+    await auditRepository.createLog({
+      branchId,
+      userId,
+      entityName,
+      entityId,
+      actionType,
+      actionDescription,
+      ipAddress,
+      userAgent,
+      oldValues,
+      newValues,
+    });
   } catch (err) {
-    logger.error('Failed to write audit log entry:', err.message);
+    logger.error('Failed to write audit log entry via stored procedure:', err.message);
   }
 }
 
 module.exports = {
   recordAudit,
 };
-

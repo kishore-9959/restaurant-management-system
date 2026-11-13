@@ -20,6 +20,7 @@ function createServiceProxy(targetUrl, serviceName) {
     target: targetUrl,
     changeOrigin: true,
     ws: true,
+    pathRewrite: (path, req) => req.originalUrl,
     logger: console,
     on: {
       proxyReq: (proxyReq, req, res) => {

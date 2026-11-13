@@ -61,14 +61,14 @@ flowchart TB
     PAY_SVC <--> RAZORPAY
 
     CMS_SVC & MENU_SVC & CART_SVC & GATEWAY <--> REDIS
-    ServiceMesh -->|Sequelize ORM\n(Owns Assigned Tables Only)| MSSQL
+    ServiceMesh -->|Stored Procedures Only\n(Shared Global DB Pool)| MSSQL
 ```
 
 ---
 
 ### 2. Microservice Inventory, Port Allocation & Responsibilities
 
-Each microservice runs in its own Node.js runtime process, maintains its own isolated `package.json`, source tree, models, routes, controllers, and validation schemas, and listens on a dedicated port:
+Each microservice runs in its own Node.js runtime process, maintains its own isolated `package.json`, source tree, repositories, services, controllers, routes, and validation schemas, and listens on a dedicated port:
 
 | # | Microservice Name | Container Name | Port | Primary Domain Responsibilities |
 | :---: | :--- | :--- | :---: | :--- |
@@ -91,10 +91,10 @@ Each microservice runs in its own Node.js runtime process, maintains its own iso
 
 ### 3. Core Architectural Constraints & Standards
 
-1. **Shared Database with Strict Service Table Ownership**:
-   - All 14 microservices connect to the single enterprise database: `RestaurantManagementDB`.
-   - **Crucial Rule**: No service may directly read or write tables owned by another service. All cross-domain data access must proceed via documented HTTP REST API calls.
-   - Sequelize models are defined only for the tables owned by each respective service.
+1. **Shared Database with Stored Procedures ONLY (Zero ORM Policy)**:
+   - All microservices connect to the single enterprise database: `RestaurantManagementDB` using the shared singleton connection pool in `backend/shared/config/database.js` (`mssql` driver).
+   - **Crucial Rule**: No Sequelize models, associations, ORM CRUD, or dynamic SQL queries are permitted. All database reads, writes, and business transactions execute strictly via dedicated SQL Server stored procedures (`executeProcedure(procedureName, inputs, outputs)`).
+   - No service may directly read or write tables owned by another service. All cross-domain data access proceeds via documented HTTP REST API calls.
 2. **Zero Message Broker (HTTP REST Communication Only)**:
    - RabbitMQ, Kafka, and gRPC are explicitly excluded.
    - All inter-service calls use Axios over HTTP with structured JSON request/response envelopes.
@@ -119,4 +119,36 @@ Redis runs as an in-memory cache and state store accessible by the services:
 2. **Menu Service**: Caches active menu category hierarchies and featured items. Invalidated instantly on item update or availability ("86") toggle.
 3. **Cart Service**: Stores unauthenticated ephemeral table carts and temporary guest sessions.
 4. **API Gateway**: Stores sliding-window rate limiting counters per IP address to throttle abusive traffic.
+
+---
+
+### 5. Standard Layered Microservice Structure
+
+Every microservice strictly follows the 4-tier clean architecture pattern:
+`HTTP Request -> Routes -> Controller -> Service -> Repository -> executeProcedure() -> SQL Server Stored Procedure`
+
+```
+backend/<service-name>/
+├── src/
+│   ├── controllers/      # HTTP request handling, DTO mapping, HTTP status codes
+│   ├── services/         # Domain business logic, hashing, token issuance, calculations
+│   ├── repositories/     # Data access layer invoking executeProcedure() from @rms/shared
+│   ├── routes/           # Express router definitions and route-level middleware mounting
+│   ├── middleware/       # Service-specific middlewares (e.g. upload, custom guards)
+│   ├── validators/       # Input validation schemas and sanitization
+│   ├── utils/            # Service-specific helper utilities
+│   ├── app.js            # Express application setup, routes registration, error handlers
+│   └── index.js          # HTTP server bootstrap, graceful shutdown handlers
+└── package.json          # Independent dependencies and npm scripts
+```
+
+### 6. Global Shared Configuration Architecture (`backend/shared/`)
+
+A single centralized library (`@rms/shared`) provides infrastructure and cross-cutting concerns:
+- **`backend/shared/config/database.js`**: Central singleton MSSQL connection pool using `mssql` package. Exposes `executeProcedure(procedureName, inputs, outputs)`, `query(sqlText, params)`, `getPool()`, and `closePool()`.
+- **`backend/shared/config/env.js`**: Traverses up directory tree to locate and load the single root `.env` configuration.
+- **`backend/shared/config/redis.js`**: Central `ioredis` singleton connection pool with automatic timeout handling.
+- **`backend/shared/middleware/`**: Standard `correlation.middleware.js`, `authentication.middleware.js`, `authorization.middleware.js`, and `error.middleware.js`.
+- **`backend/shared/utils/`**: Standard response envelopes (`successResponse`, `errorResponse`), Winston structured logger, and `asyncHandler`.
+
 

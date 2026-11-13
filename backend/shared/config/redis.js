@@ -15,10 +15,11 @@ const redisOptions = {
   port: config.redis.port,
   password: config.redis.password || undefined,
   lazyConnect: true,
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: 2,
+  connectTimeout: 2000,
   retryStrategy(times) {
-    const delay = Math.min(times * 200, 2000);
-    return delay;
+    if (times > 3) return null;
+    return Math.min(times * 200, 1000);
   },
   enableOfflineQueue: false,
 };
@@ -36,7 +37,6 @@ function getRedisClient() {
     });
 
     redisClient.on('error', (err) => {
-      // Keep error message concise to avoid log clutter
       if (process.env.NODE_ENV !== 'test') {
         console.warn(`[Redis] Connection warning: ${err.message}`);
       }
@@ -46,16 +46,24 @@ function getRedisClient() {
 }
 
 /**
- * Health check probe for Redis connectivity
+ * Health check probe for Redis connectivity with timeout guarantee
  * @returns {Promise<{healthy: boolean, message: string, timestamp: string}>}
  */
 async function testRedisConnection() {
   try {
     const client = getRedisClient();
-    if (client.status !== 'ready' && client.status !== 'connecting') {
-      await client.connect();
+    if (client.status !== 'ready') {
+      if (client.status === 'wait' || client.status === 'close' || client.status === 'end') {
+        await Promise.race([
+          client.connect(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis connect timeout')), 2000)),
+        ]);
+      }
     }
-    const pong = await client.ping();
+    const pong = await Promise.race([
+      client.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Redis ping timeout')), 2000)),
+    ]);
     return {
       healthy: pong === 'PONG',
       message: `Redis responded with ${pong} (${config.redis.host}:${config.redis.port})`,
@@ -74,4 +82,3 @@ module.exports = {
   getRedisClient,
   testRedisConnection,
 };
-
