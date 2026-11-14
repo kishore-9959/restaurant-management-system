@@ -6,9 +6,9 @@
 ### Project Status Overview
 
 - **Architecture Model**: **Microservices Architecture Only (14 Microservices, API Gateway, Redis, Socket.IO, Shared MSSQL Database, 100% Stored Procedures, Zero ORM)**
-- **Current Milestone**: Phase 5 Restaurant Service & Floor Management Complete
-- **Status**: **Phase 5 Complete (Ready for User Review before Phase 6 Menu Service)**
-- **Next Milestone**: Phase 6 — Menu Service & Redis Catalog Caching ("86" Toggle)
+- **Current Milestone**: Phase 7 Cart & Order Management Microservices Complete
+- **Status**: **Phase 7 Complete (Ready for User Review before Phase 8 Payment Service)**
+- **Next Milestone**: Phase 8 — Payment Service
 - **Lead Architect**: Senior Microservices Architect & Full-Stack Lead
 
 ---
@@ -23,16 +23,16 @@
 | **Phase 4** | Auth Service & User Service (JWT, RBAC, Profiles, PIN Login) | **COMPLETED** | **2026-11-10** | **Passed 20/20 Tests** |
 | **Refactor**| Architecture Refactoring (Stored Procedures ONLY, Global DB Config) | **COMPLETED** | **2026-11-12** | **Approved by User** |
 | **Phase 5** | Restaurant Service & Floor Management (Branches, Tables, Shifts) | **COMPLETED** | **2026-11-12** | **Passed 24/24 Tests** |
-| **Phase 6** | Menu Service & Redis Catalog Caching ("86" Toggle) | *Planned* | - | Pending |
-| **Phase 7** | Dynamic Website CMS Service & Public Customer Frontend | *Planned* | - | Pending |
-| **Phase 8** | Cart Service & Order Service (Orchestrated Saga Engine) | *Planned* | - | Pending |
-| **Phase 9** | Payment Service (Razorpay Gateway & Split Billing) | *Planned* | - | Pending |
-| **Phase 10** | Kitchen Service & Notification Service (Real-time Socket.IO KDS) | *Planned* | - | Pending |
-| **Phase 11** | Inventory Service & Recipe BOM Depletion | *Planned* | - | Pending |
-| **Phase 12** | Reservation Service & Floor Scheduling | *Planned* | - | Pending |
-| **Phase 13** | Report Service & Analytics Aggregator | *Planned* | - | Pending |
-| **Phase 14** | Client Applications Integration (Customer, Admin, Kitchen, POS) | *Planned* | - | Pending |
-| **Phase 15** | End-to-End Testing, Hardening, Nginx & Production Launch | *Planned* | - | Pending |
+| **Phase 6** | Menu Service & Redis Catalog Caching ("86" Toggle) | **COMPLETED** | **2026-11-13** | **Passed 36/36 Tests** |
+| **Phase 7** | Cart & Order Management (100% Stored Procedures, Redis Idempotency) | **COMPLETED** | **2026-11-14** | **Passed 46/46 Tests** |
+| **Phase 8** | Payment Service (Razorpay Gateway & Offline Settlement) | *Planned* | - | Pending |
+| **Phase 9** | Kitchen Service & Notification Service (Real-time Socket.IO KDS) | *Planned* | - | Pending |
+| **Phase 10**| Inventory Service & Recipe BOM Depletion | *Planned* | - | Pending |
+| **Phase 11**| Dynamic Website CMS Service & Public Customer Frontend | *Planned* | - | Pending |
+| **Phase 12**| Reservation Service & Floor Scheduling | *Planned* | - | Pending |
+| **Phase 13**| Report Service & Analytics Aggregator | *Planned* | - | Pending |
+| **Phase 14**| Client Applications Integration (Customer, Admin, Kitchen, POS) | *Planned* | - | Pending |
+| **Phase 15**| End-to-End Testing, Hardening, Nginx & Production Launch | *Planned* | - | Pending |
 
 ---
 
@@ -469,7 +469,174 @@ Verified via `scripts/verify_all_services_startup.js`:
 - No Sequelize ORM or models used.
 - Complete 4-tier architecture in `backend/menu-service/`.
 - Redis caching for customer menu catalog with automatic cache eviction on mutations.
-- Phase 7 has **not** been started. Awaiting user review and sign-off.
+- Completed and approved with 36/36 tests passing.
+
+---
+
+## Detailed Phase 7 Deliverables — Cart & Order Management Microservices
+
+### 1. Architecture & Port Compliance
+
+- **Microservice 1: Cart Service** (`rms-cart-service`, Port `8006`)
+- **Microservice 2: Order Service** (`rms-order-service`, Port `8007`)
+- **Ingress Routing**: API Gateway (Port `8000`) with `/api/v1/cart` and `/api/v1/orders` ingress routing.
+- **Pure Microservices Standard**:
+  - Zero Sequelize ORM, zero Sequelize models, zero dynamic SQL queries.
+  - 100% Microsoft SQL Server Stored Procedures via `executeProcedure()` from `@rms/shared`.
+  - Single shared MSSQL database `RestaurantManagementDB` on port `1435`.
+  - Single root `.env` via `backend/shared/config/env.js`.
+  - Redis integration on port `6379` for order idempotency (`idempotency:order:${key}`, 24-hour TTL).
+  - Inter-service communication via HTTP REST using `createHttpClient()` with `X-Correlation-ID` and `X-Internal-Service-Key`.
+
+### 2. Stored Procedures Implemented & Deployed (15 Total)
+
+| Stored Procedure Name | Script File | Target Domain & Description |
+| :--- | :--- | :--- |
+| `usp_Cart_GetOrCreate` | `database/10_CartStoredProcedures.sql` | Atomically retrieves or creates a shopping cart for a customer or guest session. |
+| `usp_Cart_GetById` | `database/10_CartStoredProcedures.sql` | Fetches complete cart details including items and item addons in 3 recordsets. |
+| `usp_Cart_GetByCustomerOrSession` | `database/10_CartStoredProcedures.sql` | Resolves active shopping cart by UserId or SessionToken. |
+| `usp_Cart_AddItem` | `database/10_CartStoredProcedures.sql` | Adds item/variant/addon selection with recalculation of SubTotal and GrandTotal. |
+| `usp_Cart_UpdateItemQuantity` | `database/10_CartStoredProcedures.sql` | Updates quantity (qty >= 1) or removes item when quantity reaches 0. |
+| `usp_Cart_RemoveItem` | `database/10_CartStoredProcedures.sql` | Deletes a cart item and associated addons, recalculating totals. |
+| `usp_Cart_Clear` | `database/10_CartStoredProcedures.sql` | Empties cart items and resets cart totals to 0.00. |
+| `usp_Cart_RecalculateTotals` | `database/10_CartStoredProcedures.sql` | Recomputes subtotal, tax total, and grand total across all items in a cart. |
+| `usp_Order_Create` | `database/11_OrderStoredProcedures.sql` | Transactionally creates an order header, line items, and item addons with price snapshots. |
+| `usp_Order_GetById` | `database/11_OrderStoredProcedures.sql` | Multi-recordset fetch for order details, items, addons, and status history. |
+| `usp_Order_GetByNumber` | `database/11_OrderStoredProcedures.sql` | Looks up an order by its unique alphanumeric order number (`ORD-YYYYMMDD-XXXX`). |
+| `usp_Order_List` | `database/11_OrderStoredProcedures.sql` | Filtered, paginated listing of orders with branch and customer scoping. |
+| `usp_Order_UpdateStatus` | `database/11_OrderStoredProcedures.sql` | Validates status progression, updates status, and appends to `OrderStatusHistory`. |
+| `usp_Order_Cancel` | `database/11_OrderStoredProcedures.sql` | Cancels non-completed/non-cancelled order with reason and records cancellation audit. |
+| `usp_Order_GetStatusHistory` | `database/11_OrderStoredProcedures.sql` | Returns sequential chronological status transitions for an order. |
+
+### 3. Cart Service Implementation Details (`backend/cart-service/`)
+
+- **Layered Architecture**:
+  - `src/repositories/cart.repository.js`: Data access wrapping the 8 Cart stored procedures.
+  - `src/services/cart.service.js`: Domain logic performing authoritative Menu Service queries, branch mismatch checking, "86" availability verification, variant/addon price calculation with 2-decimal precision, and ownership verification.
+  - `src/controllers/cart.controller.js`: Handlers for `getCart`, `getCartById`, `getCartSummary`, `addItem`, `updateItemQuantity`, `removeItem`, `clearCart`.
+  - `src/routes/cart.routes.js`: Mounted at both `/api/v1/cart` and `/`.
+  - `src/validators/index.js`: Request payload validation.
+  - `src/routes/health.js`: Dual health probes (`/health/live` process probe, `/health/ready` DB & Redis probe).
+- **Internal Service Bypass**: Supports `X-Internal-Service-Key` header allowing internal mesh calls from `order-service` to inspect and clear carts regardless of customer token.
+
+### 4. Order Service Implementation Details (`backend/order-service/`)
+
+- **Layered Architecture**:
+  - `src/repositories/order.repository.js`: Data access mapping multi-recordset results for Orders, OrderItems, OrderItemAddons, and OrderStatusHistory.
+  - `src/services/order.service.js`:
+    - **Redis Idempotency**: Keys `idempotency:order:${key}` with 24-hour TTL returning cached order payloads on repeated submissions.
+    - **Inter-Service Validation**: Queries `cart-service` (8006), `menu-service` (8005), `restaurant-service` (8003), and `user-service` (8002) via HTTP REST.
+    - **Historical Price Snapshots**: Persists `ItemNameSnapshot`, `UnitPrice`, `ItemTotal`, `VariantNameSnapshot`, and `AddonNameSnapshot` protecting historic revenue reporting against menu adjustments.
+    - **Automated Cart Purge**: Calls `cart-service` to clear active cart upon successful order placement.
+    - **Strict Order Lifecycle State Machine**:
+      `PENDING` -> `CONFIRMED` -> `PREPARING` -> `READY` -> `SERVED` -> `COMPLETED`.
+    - **Cancellation Workflow**: Orders in `SERVED` or `COMPLETED` cannot be cancelled; cancellation releases associated dining tables back to `AVAILABLE`.
+    - **Precision Arithmetic**: Currency computed using `Number(val.toFixed(2))` preventing floating-point inaccuracies.
+  - `src/controllers/order.controller.js`: Handlers for `createOrder`, `listOrders`, `getOrderById`, `getOrderByNumber`, `updateStatus`, `cancelOrder`, `getOrdersByCustomer`, `getOrdersByBranch`, `getOrderHistory`.
+  - `src/routes/order.routes.js`: Mounted at both `/api/v1/orders` and `/`.
+  - `src/routes/health.js`: Dual health probes (`/health/live`, `/health/ready`).
+
+### 5. Comprehensive Automated Verification Test Results (46/46 Passed)
+
+```
+================================================================
+  RMS PHASE 7: CART & ORDER MANAGEMENT SERVICE TEST SUITE
+================================================================
+--- GROUP 1: HEALTH & READINESS PROBES ---
+[✅ PASS] Test 01: Cart Service Liveness Probe (/health/live)
+[✅ PASS] Test 02: Cart Service Readiness Probe (/health/ready: DB & Redis)
+[✅ PASS] Test 03: Order Service Liveness Probe (/health/live)
+[✅ PASS] Test 04: Order Service Readiness Probe (/health/ready: DB)
+
+--- GROUP 2: CART RETRIEVAL & CREATION ---
+[✅ PASS] Test 05: Get or Create Active Cart for Customer (POST /api/v1/cart)
+[✅ PASS] Test 06: Cart contains required structural fields (CartId, SubTotal, Items array)
+
+--- GROUP 3: ADD ITEM TO CART & AUTHORITATIVE MENU VALIDATION ---
+[✅ PASS] Test 07: Add Base Menu Item to Cart (POST /api/v1/cart/items)
+[✅ PASS] Test 08: Subtotal recalculated with 2-decimal precision (UnitPrice * Quantity)
+[✅ PASS] Test 09: Add Item with Portion Variant & Addon Items to Cart
+[✅ PASS] Test 10: Cart Addons correctly associated with Cart Item
+[✅ PASS] Test 11: Rejects adding item from different branch (Branch Mismatch)
+[✅ PASS] Test 12: Rejects adding item marked unavailable (86 item out of stock)
+
+--- GROUP 4: CART ITEM QUANTITY & REMOVAL ---
+[✅ PASS] Test 13: Increment Item Quantity (PUT /api/v1/cart/items/:itemId)
+[✅ PASS] Test 14: Cart SubTotal recalculated accurately after quantity change
+[✅ PASS] Test 15: Rejects zero or negative quantity in update
+[✅ PASS] Test 16: Remove Single Item from Cart (DELETE /api/v1/cart/items/:itemId)
+[✅ PASS] Test 17: Removed item no longer present in Cart Items array
+[✅ PASS] Test 18: Clear entire Cart (DELETE /api/v1/cart/clear)
+[✅ PASS] Test 19: Cleared cart has 0 items and 0.00 subtotal
+
+--- GROUP 5: CART OWNERSHIP & SECURITY ---
+[✅ PASS] Test 20: Unauthenticated Cart Access Rejected (401 Unauthorized)
+[✅ PASS] Test 21: Customer A cannot access Customer B's cart (403 Forbidden)
+
+--- GROUP 6: ORDER PLACEMENT (DINE_IN, DELIVERY, TAKEAWAY) ---
+[✅ PASS] Test 22: Prepare fresh Cart with items for Order Placement
+[✅ PASS] Test 23: Place DINE_IN Order from Cart (POST /api/v1/orders)
+[✅ PASS] Test 24: Generated Order Number matches format ORD-YYYYMMDD-XXXX
+[✅ PASS] Test 25: Historical price snapshots accurately recorded (ItemName, UnitPrice)
+[✅ PASS] Test 26: Cart is automatically cleared after successful order placement
+[✅ PASS] Test 27: Dining Table status automatically updated to OCCUPIED
+[✅ PASS] Test 28: Direct Order Placement (without pre-existing cart)
+[✅ PASS] Test 29: Place DELIVERY Order with valid delivery address
+[✅ PASS] Test 30: Place TAKEAWAY Order
+
+--- GROUP 7: REDIS IDEMPOTENCY GUARANTEE ---
+[✅ PASS] Test 31: Duplicate Order Submission with same X-Idempotency-Key
+[✅ PASS] Test 32: Idempotency returns identical Order Number without duplicate DB creation
+[✅ PASS] Test 33: Response includes X-Cache-Status: HIT
+
+--- GROUP 8: ORDER QUERYING & DETAILS ---
+[✅ PASS] Test 34: Get Order by ID with items, addons, status history (GET /api/v1/orders/:id)
+[✅ PASS] Test 35: Get Order by Order Number (GET /api/v1/orders/number/:number)
+[✅ PASS] Test 36: List Orders with Branch Filter & Pagination (GET /api/v1/orders)
+[✅ PASS] Test 37: List Customer Orders (GET /api/v1/orders/my-orders)
+
+--- GROUP 9: STRICT STATE MACHINE LIFECYCLE ---
+[✅ PASS] Test 38: Transition Order from PENDING -> CONFIRMED
+[✅ PASS] Test 39: Transition Order from CONFIRMED -> PREPARING
+[✅ PASS] Test 40: Transition Order from PREPARING -> READY
+[✅ PASS] Test 41: Transition Order from READY -> SERVED
+[✅ PASS] Test 42: Transition Order from SERVED -> COMPLETED
+[✅ PASS] Test 43: Invalid Transition Rejected: COMPLETED -> PREPARING (400 Bad Request)
+[✅ PASS] Test 44: Audit Trail records complete transition sequence in OrderStatusHistory
+
+--- GROUP 10: CANCELLATIONS & ERROR HANDLING ---
+[✅ PASS] Test 45: Cannot cancel COMPLETED order (400 Bad Request)
+[✅ PASS] Test 46: Place new PENDING order and successfully CANCEL (Table reset to AVAILABLE)
+
+================================================================
+  TEST SUMMARY: 46 Passed / 0 Failed (100% Success Rate)
+================================================================
+🎉 ALL 46 PHASE 7 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
+```
+
+### 6. Full Regression Verification Summary
+
+| Test Suite | File | Tests Run | Result |
+| :--- | :--- | :---: | :---: |
+| **Phase 4 Suite** (Auth & User Services) | `scripts/test_phase4.js` | 20 / 20 | **100% PASSED** |
+| **Phase 5 Suite** (Restaurant & Floor Management) | `scripts/test_phase5.js` | 24 / 24 | **100% PASSED** |
+| **Phase 6 Suite** (Menu Service & Redis Catalog) | `scripts/test_phase6.js` | 36 / 36 | **100% PASSED** |
+| **Phase 7 Suite** (Cart & Order Services) | `scripts/test_phase7.js` | 46 / 46 | **100% PASSED** |
+| **All Services Health Verification** | `scripts/verify_all_services_startup.js` | 14 / 14 | **100% PASSED** |
+| **Total Test Assertions Passing** | | **140 / 140** | **100% PASS RATE** |
+
+---
+
+### Phase 7 Scope Boundaries Observed
+- Zero modifications made to `database/01` through `09` SQL scripts or pre-existing seed data.
+- Pure Stored Procedures execution for all SQL Server database operations (`database/10_CartStoredProcedures.sql` and `database/11_OrderStoredProcedures.sql`).
+- All stored procedures deployed with `SET ANSI_NULLS ON` and `SET QUOTED_IDENTIFIER ON`.
+- Single global database pool in `backend/shared/config/database.js` and single root `.env`.
+- No Sequelize ORM or models used.
+- Complete 4-tier architecture in both `backend/cart-service/` and `backend/order-service/`.
+- Strict 2-decimal precision currency arithmetic.
+- Phase 8 (Payment Service) has **not** been started. Awaiting user review and sign-off.
+
 
 
 

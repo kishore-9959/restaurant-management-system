@@ -117,8 +117,9 @@ Each microservice runs in its own Node.js runtime process, maintains its own iso
 Redis runs as an in-memory cache and state store accessible by the services:
 1. **CMS Service**: Caches public homepage layout, settings, and navigation trees with a 15-minute TTL. Invalidated instantly upon admin content publish.
 2. **Menu Service**: Caches active menu category hierarchies and featured items. Invalidated instantly on item update or availability ("86") toggle.
-3. **Cart Service**: Stores unauthenticated ephemeral table carts and temporary guest sessions.
-4. **API Gateway**: Stores sliding-window rate limiting counters per IP address to throttle abusive traffic.
+3. **Cart Service**: Ephemeral caching for guest table sessions and temporary carts.
+4. **Order Service**: Implements idempotency caching using key pattern `idempotency:order:{idempotencyKey}` with 24-hour (86,400s) TTL, preventing duplicate order creation and payments.
+5. **API Gateway**: Stores sliding-window rate limiting counters per IP address to throttle abusive traffic.
 
 ---
 

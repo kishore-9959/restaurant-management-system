@@ -66,6 +66,17 @@ async function getAddresses(userId) {
   return customerAddressRepository.getAddressesByUserId(userId);
 }
 
+async function getAddressById(addressId, userId = null) {
+  const address = await customerAddressRepository.getAddressById(addressId, userId);
+  if (!address) {
+    const error = new Error('Address not found.');
+    error.statusCode = 404;
+    error.code = 'ADDRESS_NOT_FOUND';
+    throw error;
+  }
+  return address;
+}
+
 async function addAddress(userId, addressData, metadata = {}) {
   const address = await customerAddressRepository.createAddress({
     userId,
@@ -165,6 +176,7 @@ module.exports = {
   getProfile,
   updateProfile,
   getAddresses,
+  getAddressById,
   addAddress,
   createAddress: addAddress,
   updateAddress,

@@ -9,7 +9,24 @@ const jwt = require('jsonwebtoken');
 const { config, errorResponse } = require('@rms/shared');
 
 function authenticate(req, res, next) {
-  // 1. Check if headers were injected by trusted API Gateway
+  // 1. Check if call has internal service key
+  const internalSecret = config.security?.internalServiceKey || config.internalServiceKey;
+  const internalKey = req.headers['x-internal-service-key'];
+  if (internalKey && internalSecret && internalKey === internalSecret) {
+    const hasProxiedUser = Boolean(req.headers['x-user-id']);
+    const userRoles = req.headers['x-user-role'] ? req.headers['x-user-role'].split(',') : (hasProxiedUser ? [] : ['SYSTEM']);
+    req.isInternalService = !hasProxiedUser;
+    req.user = {
+      userId: req.headers['x-user-id'] || 'system',
+      userType: req.headers['x-user-type'] || (hasProxiedUser ? 'CUSTOMER' : 'INTERNAL_SERVICE'),
+      branchId: req.headers['x-branch-id'] ? parseInt(req.headers['x-branch-id'], 10) : null,
+      roles: userRoles,
+      permissions: req.headers['x-user-permissions'] ? req.headers['x-user-permissions'].split(',') : ['*'],
+    };
+    return next();
+  }
+
+  // 2. Check if headers were injected by trusted API Gateway
   const gatewayUserId = req.headers['x-user-id'];
   if (gatewayUserId) {
     const rolesHeader = req.headers['x-user-role'] || '';
@@ -23,7 +40,7 @@ function authenticate(req, res, next) {
     return next();
   }
 
-  // 2. Direct Bearer token verification fallback
+  // 3. Direct Bearer token verification fallback
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return errorResponse(res, {
@@ -35,10 +52,7 @@ function authenticate(req, res, next) {
 
   const token = authHeader.split(' ')[1];
   try {
-    const payload = jwt.verify(token, config.jwtAccessSecret, {
-      issuer: 'rms-auth-service',
-      audience: 'rms-client',
-    });
+    const payload = jwt.verify(token, config.security?.jwtAccessSecret || config.jwtAccessSecret);
 
     req.user = {
       userId: payload.userId || payload.sub,

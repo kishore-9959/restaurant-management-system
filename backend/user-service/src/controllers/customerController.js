@@ -69,6 +69,25 @@ async function getAddresses(req, res) {
   }
 }
 
+async function getAddressById(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userType === 'INTERNAL_SERVICE' ? null : req.user?.userId;
+    const address = await customerService.getAddressById(id, userId);
+    return successResponse(res, {
+      statusCode: 200,
+      message: 'Address retrieved successfully.',
+      data: address,
+    });
+  } catch (err) {
+    return errorResponse(res, {
+      statusCode: err.statusCode || 500,
+      code: err.code || 'ADDRESS_FETCH_ERROR',
+      message: err.message,
+    });
+  }
+}
+
 async function createAddress(req, res) {
   try {
     const userId = req.user.userId;
@@ -148,6 +167,7 @@ module.exports = {
   getProfile,
   updateProfile,
   getAddresses,
+  getAddressById,
   createAddress,
   updateAddress,
   deleteAddress,

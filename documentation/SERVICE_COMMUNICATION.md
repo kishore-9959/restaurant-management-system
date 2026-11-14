@@ -172,3 +172,87 @@ sequenceDiagram
     GW-->>Guest: HTTP 200 OK (Renders Dynamic Ant Design Sections)
 ```
 
+#### 5.4 Cart Validation & Order Placement Workflow
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Customer as Customer / POS Staff
+    participant GW as API Gateway (:8000)
+    participant OrderSvc as Order Service (:8007)
+    participant CartSvc as Cart Service (:8006)
+    participant MenuSvc as Menu Service (:8005)
+    participant RestSvc as Restaurant Service (:8003)
+    participant UserSvc as User Service (:8002)
+    participant Redis as Redis (:6379)
+    participant DB as MSSQL (RestaurantManagementDB)
+
+    Customer->>GW: POST /api/v1/orders (Order Payload, X-Idempotency-Key)
+    GW->>OrderSvc: Forward POST /api/v1/orders with JWT & Correlation Headers
+    
+    OrderSvc->>Redis: GET idempotency:order:{idempotencyKey}
+    alt Cached Order Exists (Idempotency Hit)
+        Redis-->>OrderSvc: Cached Order JSON
+        OrderSvc-->>GW: HTTP 200 OK (Cached Order, X-Cache-Status: HIT)
+        GW-->>Customer: HTTP 200 OK
+    else Idempotency Miss
+        OrderSvc->>RestSvc: HTTP GET /api/v1/restaurant/branches/:branchId (Check branch active)
+        RestSvc-->>OrderSvc: HTTP 200 OK (Branch status verified)
+        
+        alt DINE_IN Order
+            OrderSvc->>RestSvc: HTTP GET /api/v1/restaurant/tables/:tableId (Validate table exists)
+            RestSvc-->>OrderSvc: HTTP 200 OK (Table valid)
+        else DELIVERY Order
+            OrderSvc->>UserSvc: HTTP GET /api/v1/users/addresses/:addressId (Internal Key Auth)
+            UserSvc-->>OrderSvc: HTTP 200 OK (Delivery address valid)
+        end
+
+        alt Source is Cart (cartId provided)
+            OrderSvc->>CartSvc: HTTP GET /api/v1/cart/:cartId (Internal Key Auth)
+            CartSvc-->>OrderSvc: HTTP 200 OK (Cart items, addons, branchId)
+        end
+
+        loop For each item in order
+            OrderSvc->>MenuSvc: HTTP GET /api/v1/menu/items/:menuItemId
+            MenuSvc-->>OrderSvc: HTTP 200 OK (Authoritative Price, Variants, Addons, 86 Status)
+            OrderSvc->>OrderSvc: Enforce active availability, recalculate with 2-decimal precision
+        end
+
+        OrderSvc->>DB: Execute usp_Order_Create (Snapshots: ItemName, Variant, Addons, UnitPrice, Totals)
+        DB-->>OrderSvc: Result Sets (Order Header, Order Items, Addons)
+
+        alt DINE_IN Order
+            OrderSvc->>RestSvc: HTTP PATCH /api/v1/restaurant/tables/:tableId/status ('OCCUPIED')
+        end
+
+        alt Source was Cart
+            OrderSvc->>CartSvc: HTTP DELETE /api/v1/cart/:cartId (Internal Key Auth)
+        end
+
+        OrderSvc->>Redis: SETEX idempotency:order:{idempotencyKey} 86400 (Order JSON)
+        OrderSvc-->>GW: HTTP 201 Created (Created Order)
+        GW-->>Customer: HTTP 201 Created
+    end
+```
+
+---
+
+### 6. Phase 7 Inter-Service REST API Contracts
+
+#### 6.1 Cart Service Contracts (`cart-service` :8006)
+- **Downstream Dependency**: Calls `menu-service` (:8005) via `GET /api/v1/menu/items/:id` to authoritatively validate dish prices, variants, addon pricing, and item availability before mutating cart records.
+- **Inbound Mesh Access**: Accepts internal mesh calls equipped with `X-Internal-Service-Key` header, granting `SYSTEM` internal service bypass for order placement cart extraction (`GET /api/v1/cart/:id`) and post-checkout cleanup (`DELETE /api/v1/cart/:id`).
+
+#### 6.2 Order Service Contracts (`order-service` :8007)
+- **Calls `cart-service` (:8006)**:
+  - `GET /api/v1/cart/:cartId`: Extracts active items, portion variants, and addons.
+  - `DELETE /api/v1/cart/:cartId`: Clears shopping cart upon successful order placement.
+- **Calls `menu-service` (:8005)**:
+  - `GET /api/v1/menu/items/:id`: Validates live item pricing, variant pricing, addon pricing, and active status.
+- **Calls `restaurant-service` (:8003)**:
+  - `GET /api/v1/restaurant/branches/:branchId`: Verifies branch active status.
+  - `GET /api/v1/restaurant/tables/:tableId`: Validates dining table existence and association.
+  - `PATCH /api/v1/restaurant/tables/:tableId/status`: Updates table status to `OCCUPIED` upon dine-in placement, and `AVAILABLE` upon completion or cancellation.
+- **Calls `user-service` (:8002)**:
+  - `GET /api/v1/users/addresses/:addressId`: Validates customer delivery address ownership and active status.
+
+

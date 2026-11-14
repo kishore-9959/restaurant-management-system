@@ -274,6 +274,26 @@ All database mutations and queries execute through dedicated, compiled SQL Serve
 90. `dbo.usp_AddonItem_Delete`: Soft delete addon item choice.
 91. `dbo.usp_Menu_GetCatalogByBranch`: High-performance multi-recordset customer catalog engine returning active categories, available items, variants, addon groups with items, and primary photos in a single database roundtrip for Redis caching.
 
+#### 5.5 Cart Service (`database/10_CartStoredProcedures.sql`)
+92. `dbo.usp_Cart_GetOrCreate`: Retrieve active non-expired cart by customer or session token, or initialize a new cart session with a 7-day TTL.
+93. `dbo.usp_Cart_GetById`: Multi-recordset cart retrieval returning Cart Header (subtotal, tax, grand total), Cart Items, and linked Cart Item Addons.
+94. `dbo.usp_Cart_GetByCustomerOrSession`: Lookup active cart for an authenticated customer or guest session token.
+95. `dbo.usp_Cart_AddItem`: Add an item with portion variant, quantity, unit price, instructions, and JSON array of selected addons. Recalculates cart totals atomically.
+96. `dbo.usp_Cart_UpdateItemQuantity`: Update quantity and line totals for an item and its attached addons. Deletes item when quantity is 0.
+97. `dbo.usp_Cart_RemoveItem`: Remove a line item and cascade-delete its addons, followed by automated cart total recomputation.
+98. `dbo.usp_Cart_Clear`: Delete all items and addons from a cart and reset subtotals and totals to 0.00.
+99. `dbo.usp_Cart_RecalculateTotals`: Internal calculation engine summing item prices and addon totals, computing tax according to branch rules, and writing grand totals.
+
+#### 5.6 Order Service (`database/11_OrderStoredProcedures.sql`)
+100. `dbo.usp_Order_Create`: Transactional order creator generating sequential human-readable `OrderNumber` (`ORD-YYYYMMDD-XXXX`), writing header, copying historical pricing snapshots into `OrderItems` and `OrderItemAddons`, updating table status for dine-in, and logging initial status into `OrderStatusHistory`.
+101. `dbo.usp_Order_GetById`: Multi-recordset order retrieval returning Order Header (with customer, table, and branch details), Order Items (with historical snapshots), Order Item Addons, and Order Status History.
+102. `dbo.usp_Order_GetByNumber`: Lookup complete order by human-readable `OrderNumber` (`ORD-YYYYMMDD-XXXX`).
+103. `dbo.usp_Order_List`: High-speed paginated query engine filtering orders by branch, customer, status, payment status, order type, and date range.
+104. `dbo.usp_Order_UpdateStatus`: Strict state machine validator and updater (`PENDING` -> `CONFIRMED` -> `PREPARING` -> `READY` -> `SERVED` -> `COMPLETED`). Updates table state to `CLEANING` on completion and records transition in `OrderStatusHistory`.
+105. `dbo.usp_Order_Cancel`: Safe cancellation procedure releasing occupied tables back to `AVAILABLE` and auditing cancellation reason into `OrderStatusHistory`.
+106. `dbo.usp_Order_GetStatusHistory`: Retrieve complete chronological audit trail of state transitions for an order.
+
+
 
 
 

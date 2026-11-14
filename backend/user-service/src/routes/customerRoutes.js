@@ -18,6 +18,7 @@ router.put('/profile', customerController.updateProfile);
 
 // Addresses
 router.get('/addresses', customerController.getAddresses);
+router.get('/addresses/:id', customerController.getAddressById);
 router.post('/addresses', customerController.createAddress);
 router.put('/addresses/:id', customerController.updateAddress);
 router.delete('/addresses/:id', customerController.deleteAddress);
