@@ -239,5 +239,41 @@ All database mutations and queries execute through dedicated, compiled SQL Serve
 57. `dbo.usp_DiningTable_Delete`: Safe soft deletion of dining tables (protects occupied/billed tables).
 58. `dbo.usp_Floor_GetLayout`: Multi-recordset 2D visual floor plan engine returning branch KPIs, sections, and tables with layout coordinates.
 
+#### 5.4 Menu Service & Redis Catalog Caching (`database/09_MenuStoredProcedures.sql`)
+59. `dbo.usp_Category_Create`: Insert hierarchical category (global or branch-scoped) with slug uniqueness and parent validation.
+60. `dbo.usp_Category_Update`: Update category details, sort display order, slug, and hierarchical parent reference.
+61. `dbo.usp_Category_GetById`: Fetch category details with item counts and child subcategory counts.
+62. `dbo.usp_Category_ListByBranch`: Retrieve active categories for branch or global scope, ordered by display sequence.
+63. `dbo.usp_Category_SetStatus`: Activate/deactivate category.
+64. `dbo.usp_Category_Delete`: Safe soft deletion of category with integrity checks preventing deletion of categories with active items or subcategories.
+65. `dbo.usp_MenuItem_Create`: Create menu item with base price, cost price, tax percentage, dietary type (VEG/NON_VEG/VEGAN/EGG/HALAL), spicy level, preparation time, and availability.
+66. `dbo.usp_MenuItem_Update`: Update menu item details, category assignment, pricing, and display settings.
+67. `dbo.usp_MenuItem_GetById`: Multi-recordset retrieval returning item details, variants, linked addon groups with items, and photo gallery.
+68. `dbo.usp_MenuItem_ListByBranch`: Paginated search and filtering by category, dietary type, featured flag, and availability.
+69. `dbo.usp_MenuItem_SetAvailability`: The high-speed "86" out-of-stock toggle for kitchen and floor staff.
+70. `dbo.usp_MenuItem_UpdatePricing`: Atomic base price, cost price, and tax percentage adjustment.
+71. `dbo.usp_MenuItem_Delete`: Soft delete menu item (`IsDeleted = 1`).
+72. `dbo.usp_MenuItemVariant_Create`: Create portion/size variant with SKU, price adjustment, and default variant enforcement.
+73. `dbo.usp_MenuItemVariant_Update`: Update variant name, SKU, price adjustment, and default state.
+74. `dbo.usp_MenuItemVariant_SetAvailability`: Independent "86" availability toggle for individual portion sizes.
+75. `dbo.usp_MenuItemVariant_Delete`: Soft delete menu item variant.
+76. `dbo.usp_MenuItemVariant_ListByItem`: Retrieve all active portion variants configured for an item.
+77. `dbo.usp_MenuItemImage_Add`: Add food photo URL with primary image flag and display sort order.
+78. `dbo.usp_MenuItemImage_Delete`: Delete image row from gallery.
+79. `dbo.usp_MenuItemImage_SetPrimary`: Set specific image as the primary cover photo, resetting all other item images.
+80. `dbo.usp_MenuItemImage_ListByItem`: Retrieve photo gallery for a menu item.
+81. `dbo.usp_AddonGroup_Create`: Create customization addon group (e.g. Crust Choice, Cheeses, Dressings) with min/max selection bounds.
+82. `dbo.usp_AddonGroup_Update`: Update group name and selection constraints.
+83. `dbo.usp_AddonGroup_GetById`: Fetch addon group details along with its non-deleted options.
+84. `dbo.usp_AddonGroup_ListByBranch`: List addon groups available to a branch.
+85. `dbo.usp_AddonGroup_LinkToMenuItem`: Map addon group to menu item with custom display order.
+86. `dbo.usp_AddonGroup_UnlinkFromMenuItem`: Remove mapping between menu item and addon group.
+87. `dbo.usp_AddonItem_Create`: Create individual addon choice with price.
+88. `dbo.usp_AddonItem_Update`: Update addon choice name and price.
+89. `dbo.usp_AddonItem_SetAvailability`: Individual "86" availability toggle for addon choices.
+90. `dbo.usp_AddonItem_Delete`: Soft delete addon item choice.
+91. `dbo.usp_Menu_GetCatalogByBranch`: High-performance multi-recordset customer catalog engine returning active categories, available items, variants, addon groups with items, and primary photos in a single database roundtrip for Redis caching.
+
+
 
 

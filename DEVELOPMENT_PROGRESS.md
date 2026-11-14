@@ -362,7 +362,115 @@ Verified via `scripts/verify_all_services_startup.js`:
 - Single global database pool in `backend/shared/config/database.js` and single root `.env`.
 - No Sequelize ORM or models used.
 - Real-time notification integration via internal HTTP broadcast to `notification-service`.
-- Phase 6 (Menu Service & Redis Catalog Caching) has **not** been started. Awaiting user review and sign-off.
+- Phase 6 (Menu Service & Redis Catalog Caching) has been completed and verified. Awaiting user review and sign-off before Phase 7.
+
+---
+
+## Phase 6 – Menu Service & Redis Catalog Caching (Completed)
+
+**Status:** **PHASE 6 COMPLETE – ALL 36 TEST REQUIREMENTS PASSED (100% SUCCESS)**  
+**Verification Date:** November 14, 2026  
+**Active Test Runner:** `scripts/test_phase6.js` (36/36 Passed)  
+**Regression Test Runners:** `scripts/test_phase5.js` (24/24 Passed), `scripts/test_phase4.js` (20/20 Passed)  
+**Microservices Dual-Probe Audit:** `scripts/verify_all_services_startup.js` (14/14 Services Healthy)  
+**Database Stored Procedures:** `database/09_MenuStoredProcedures.sql` (33 Stored Procedures Deployed)  
+**API Documentation:** [`RMS_Phase6_API_Documentation.md`](file:///c:/Projects/restaurant-management-system/restaurant-management-system/documentation/RMS_Phase6_API_Documentation.md)  
+
+### 1. Database Table Ownership & Stored Procedures Mapping (Zero ORM)
+
+| Microservice | Port | Owned Database Tables | Database Access Implementation | Stored Procedures Mapped |
+| :--- | :---: | :--- | :--- | :--- |
+| **`menu-service`** | **8005** | `dbo.Categories`<br>`dbo.MenuItems`<br>`dbo.MenuItemVariants`<br>`dbo.MenuItemImages`<br>`dbo.AddonGroups`<br>`dbo.AddonItems`<br>`dbo.MenuItemAddonGroups` | `category.repository.js`<br>`menuItem.repository.js`<br>`addon.repository.js` | `usp_Category_Create`<br>`usp_Category_Update`<br>`usp_Category_GetById`<br>`usp_Category_ListByBranch`<br>`usp_Category_SetStatus`<br>`usp_Category_Delete`<br>`usp_MenuItem_Create`<br>`usp_MenuItem_Update`<br>`usp_MenuItem_GetById`<br>`usp_MenuItem_ListByBranch`<br>`usp_MenuItem_SetAvailability`<br>`usp_MenuItem_UpdatePricing`<br>`usp_MenuItem_Delete`<br>`usp_MenuItemVariant_Create`<br>`usp_MenuItemVariant_Update`<br>`usp_MenuItemVariant_SetAvailability`<br>`usp_MenuItemVariant_Delete`<br>`usp_MenuItemVariant_ListByItem`<br>`usp_MenuItemImage_Add`<br>`usp_MenuItemImage_Delete`<br>`usp_MenuItemImage_SetPrimary`<br>`usp_MenuItemImage_ListByItem`<br>`usp_AddonGroup_Create`<br>`usp_AddonGroup_Update`<br>`usp_AddonGroup_GetById`<br>`usp_AddonGroup_ListByBranch`<br>`usp_AddonGroup_LinkToMenuItem`<br>`usp_AddonGroup_UnlinkFromMenuItem`<br>`usp_AddonItem_Create`<br>`usp_AddonItem_Update`<br>`usp_AddonItem_SetAvailability`<br>`usp_AddonItem_Delete`<br>`usp_Menu_GetCatalogByBranch` |
+| **`api-gateway`** | **8000** | Reverse Proxy Ingress Router | N/A | Ingress routes mounted: `/api/v1/menu`. Public whitelist: `/api/v1/menu/public(...)`. RBAC enforcement: `/api/v1/menu/admin(...)` restricted to `SUPER_ADMIN` and `RESTAURANT_MANAGER`. |
+
+### 2. Redis Catalog Caching & Invalidation Architecture
+
+- **Catalog Cache Key Pattern**: `menu:catalog:branch:{branchId}:all` and `menu:catalog:branch:{branchId}:cat:{categoryId}`.
+- **Cache Strategy**: Look-aside with 15-minute (900 seconds) TTL.
+- **Cache Header**: Ingress returns `X-Cache-Status: HIT` or `X-Cache-Status: MISS`.
+- **Automatic Cache Invalidation**: Every mutation (creating/updating/deleting categories, menu items, portion variants, addon groups, addon items, pricing adjustments, or "86" availability toggles) automatically purges corresponding branch cache keys via `invalidateBranchMenuCache(branchId)`.
+- **Administrative Flush**: Dedicated endpoint `POST /api/v1/menu/admin/cache/purge` allows instant manual cache eviction.
+
+### 3. Comprehensive Automated Verification Test Results (36/36 Passed)
+
+```
+================================================================
+  RMS PHASE 6: MENU SERVICE & REDIS CATALOG CACHING SUITE
+================================================================
+--- GROUP 1: HEALTH & READINESS PROBES ---
+[✅ PASS] Test 01: Menu Service Liveness Probe (/health/live)
+[✅ PASS] Test 02: Menu Service Readiness Probe (/health/ready: DB & Redis)
+
+--- GROUP 2: CATEGORY MANAGEMENT ---
+[✅ PASS] Test 03: Create Category (POST /api/v1/menu/categories)
+[✅ PASS] Test 04: Get Category by ID (GET /api/v1/menu/categories/:id)
+[✅ PASS] Test 05: Update Category (PUT /api/v1/menu/categories/:id)
+[✅ PASS] Test 06: List Categories by Branch (GET /api/v1/menu/categories?branchId=1)
+[✅ PASS] Test 07: Toggle Category Active Status (PATCH /api/v1/menu/categories/:id/status)
+
+--- GROUP 3: MENU ITEM MANAGEMENT ---
+[✅ PASS] Test 08: Create Menu Item (POST /api/v1/menu/items)
+[✅ PASS] Test 09: Get Menu Item by ID with Multi-Recordset (GET /api/v1/menu/items/:id)
+[✅ PASS] Test 10: Update Menu Item (PUT /api/v1/menu/items/:id)
+[✅ PASS] Test 11: List Menu Items with Filters (GET /api/v1/menu/items?branchId=1&dietaryType=VEG)
+[✅ PASS] Test 12: Menu Item Availability "86" Toggle by Chef (PATCH /api/v1/menu/items/:id/availability)
+[✅ PASS] Test 13: Single Item Pricing Update (PATCH /api/v1/menu/items/:id/pricing)
+[✅ PASS] Test 14: Bulk Pricing Update (POST /api/v1/menu/items/pricing/bulk)
+
+--- GROUP 4: MENU VARIANTS MANAGEMENT ---
+[✅ PASS] Test 15: Create Menu Variant (POST /api/v1/menu/items/:id/variants)
+[✅ PASS] Test 16: Update Menu Variant (PUT /api/v1/menu/items/variants/:variantId)
+[✅ PASS] Test 17: Toggle Variant Availability (PATCH /api/v1/menu/items/variants/:variantId/availability)
+
+--- GROUP 5: MENU IMAGES MANAGEMENT ---
+[✅ PASS] Test 18: Add Image to Menu Item (POST /api/v1/menu/items/:id/images)
+[✅ PASS] Test 19: List Images for Menu Item (GET /api/v1/menu/items/:id/images)
+
+--- GROUP 6: ADDON GROUPS & ADDON ITEMS ---
+[✅ PASS] Test 20: Create Addon Group (POST /api/v1/menu/addons/groups)
+[✅ PASS] Test 21: Create Addon Item (POST /api/v1/menu/addons/groups/:id/items)
+[✅ PASS] Test 22: Link Addon Group to Menu Item (POST /api/v1/menu/items/:id/addons/:groupId)
+[✅ PASS] Test 23: Toggle Addon Item Availability (PATCH /api/v1/menu/addons/items/:id/availability)
+
+--- GROUP 7: REDIS CATALOG CACHING & PUBLIC ACCESS ---
+[✅ PASS] Test 24: Public Catalog Access - Cache MISS (GET /api/v1/menu/public/catalog/1)
+[✅ PASS] Test 25: Public Catalog Access - Cache HIT (GET /api/v1/menu/public/catalog/1)
+[✅ PASS] Test 26: Automatic Redis Cache Invalidation on Mutation (Cache MISS after 86 toggle)
+[✅ PASS] Test 27: Public Categories Lookup (GET /api/v1/menu/public/categories/1)
+[✅ PASS] Test 28: Public Item Details Lookup (GET /api/v1/menu/public/items/:id)
+
+--- GROUP 8: SECURITY & RBAC ENFORCEMENT ---
+[✅ PASS] Test 29: Unauthenticated Mutate Rejected (401 Unauthorized)
+[✅ PASS] Test 30: Waitstaff Role Forbidden from Creating Menu Items (403 Forbidden)
+[✅ PASS] Test 31: Chef Forbidden from Updating Prices (403 Forbidden)
+
+--- GROUP 9: VALIDATION & ERROR HANDLING ---
+[✅ PASS] Test 32: Invalid Dietary Type Rejected (400 Bad Request)
+[✅ PASS] Test 33: Negative Base Price Rejected (400 Bad Request)
+[✅ PASS] Test 34: Non-existent Item Lookup Returns 404
+
+--- CLEANUP & SOFT DELETE ---
+[✅ PASS] Test 35: Soft Delete Menu Item (DELETE /api/v1/menu/items/:id)
+[✅ PASS] Test 36: Soft Deleted Item Inaccessible via API (404 Not Found)
+
+================================================================
+  TEST SUMMARY: 36 Passed / 0 Failed (100% Success Rate)
+================================================================
+🎉 ALL 36 PHASE 6 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
+```
+
+---
+
+### Phase 6 Scope Boundaries Observed
+- Zero modifications made to `database/01` through `08` SQL scripts or pre-existing seed data.
+- Pure Stored Procedures execution for all SQL Server database operations (`database/09_MenuStoredProcedures.sql`).
+- All stored procedures deployed with `SET ANSI_NULLS ON` and `SET QUOTED_IDENTIFIER ON` to support filtered indexes (`WHERE IsDeleted = 0`).
+- Single global database pool in `backend/shared/config/database.js` and single root `.env`.
+- No Sequelize ORM or models used.
+- Complete 4-tier architecture in `backend/menu-service/`.
+- Redis caching for customer menu catalog with automatic cache eviction on mutations.
+- Phase 7 has **not** been started. Awaiting user review and sign-off.
+
 
 
 
