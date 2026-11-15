@@ -545,7 +545,7 @@ BEGIN
     DECLARE @IsValidTransition BIT = 0;
 
     IF @CurrentStatus = 'PENDING' AND @NewStatus IN ('CONFIRMED', 'CANCELLED') SET @IsValidTransition = 1;
-    IF @CurrentStatus = 'CONFIRMED' AND @NewStatus IN ('PREPARING', 'CANCELLED') SET @IsValidTransition = 1;
+    IF @CurrentStatus = 'CONFIRMED' AND @NewStatus IN ('PREPARING', 'READY', 'CANCELLED') SET @IsValidTransition = 1;
     IF @CurrentStatus = 'PREPARING' AND @NewStatus IN ('READY', 'CANCELLED') SET @IsValidTransition = 1;
     IF @CurrentStatus = 'READY' AND @NewStatus IN ('SERVED', 'COMPLETED') SET @IsValidTransition = 1;
     IF @CurrentStatus = 'SERVED' AND @NewStatus IN ('COMPLETED') SET @IsValidTransition = 1;

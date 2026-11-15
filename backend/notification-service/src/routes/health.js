@@ -2,14 +2,14 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - NOTIFICATION SERVICE HEALTH ROUTE
  * File: backend/notification-service/src/routes/health.js
- * Description: Liveness and Readiness probes for Notification Service (DB + Socket.IO).
+ * Description: Liveness and Readiness probes for Notification Service (DB + Redis + Socket.IO).
  * ============================================================================
  */
 
 const express = require('express');
 const router = express.Router();
-const { config, testDbConnection, successResponse } = require('@rms/shared');
-const { getSocketServer } = require('../socket');
+const { config, testDbConnection, testRedisConnection, successResponse } = require('@rms/shared');
+const { socketManager } = require('../socket');
 
 // 1. Liveness Probe: Verifies the Node.js process is responsive
 router.get('/health/live', (req, res) => {
@@ -31,11 +31,13 @@ router.get('/health/live', (req, res) => {
   });
 });
 
-// 2. Readiness Probe: Verifies database connectivity and Socket.IO hub readiness
+// 2. Readiness Probe: Verifies database connectivity, Redis, and Socket.IO hub readiness
 async function checkReadiness(req, res) {
-  const dbHealth = await testDbConnection();
-  const io = getSocketServer();
-  const socketClientCount = io ? io.engine?.clientsCount || 0 : 0;
+  const [dbHealth, redisHealth] = await Promise.all([
+    testDbConnection(),
+    testRedisConnection ? testRedisConnection() : Promise.resolve({ healthy: true }),
+  ]);
+  const socketClientCount = socketManager ? socketManager.getConnectedCount() : 0;
   const isReady = dbHealth.healthy === true;
 
   return successResponse(res, {
@@ -50,6 +52,11 @@ async function checkReadiness(req, res) {
       timestamp: new Date().toISOString(),
       dependencies: {
         database: dbHealth,
+        redis: redisHealth,
+        socketServer: {
+          available: Boolean(socketManager?.io),
+          clientsConnected: socketClientCount,
+        },
       },
     },
   });

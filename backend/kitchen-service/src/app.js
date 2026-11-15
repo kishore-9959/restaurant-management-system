@@ -18,6 +18,7 @@ const {
 } = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
+const kitchenRoutes = require('./routes/kitchen.routes');
 
 const logger = createServiceLogger('kitchen-service');
 const app = express();
@@ -30,6 +31,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(healthRoutes);
+
+// KDS routes mounted at root and API gateway prefix
+app.use('/api/v1/kds', kitchenRoutes);
+app.use('/', kitchenRoutes);
 
 app.use((req, res) => {
   return errorResponse(res, {

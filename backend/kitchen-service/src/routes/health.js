@@ -8,7 +8,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { config, testDbConnection, successResponse } = require('@rms/shared');
+const { config, testDbConnection, testRedisConnection, successResponse } = require('@rms/shared');
 
 // 1. Liveness Probe: Verifies the Node.js process is responsive
 router.get('/health/live', (req, res) => {
@@ -30,9 +30,12 @@ router.get('/health/live', (req, res) => {
   });
 });
 
-// 2. Readiness Probe: Verifies database connectivity
+// 2. Readiness Probe: Verifies database and redis connectivity
 async function checkReadiness(req, res) {
-  const dbHealth = await testDbConnection();
+  const [dbHealth, redisHealth] = await Promise.all([
+    testDbConnection(),
+    testRedisConnection ? testRedisConnection() : Promise.resolve({ healthy: true }),
+  ]);
   const isReady = dbHealth.healthy === true;
 
   return successResponse(res, {
@@ -46,6 +49,7 @@ async function checkReadiness(req, res) {
       timestamp: new Date().toISOString(),
       dependencies: {
         database: dbHealth,
+        redis: redisHealth,
       },
     },
   });

@@ -45,6 +45,7 @@
   "author": "Antigravity Engineering",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^9.2.5"
+    "concurrently": "^9.2.5",
+    "socket.io-client": "^4.8.4"
   }
 }

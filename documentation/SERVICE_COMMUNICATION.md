@@ -342,6 +342,74 @@ sequenceDiagram
 - **Inbound Public Webhook Ingress**: Receives unauthenticated Razorpay cloud notifications at `POST /api/v1/payments/razorpay/webhook`, verified via `X-Razorpay-Signature` with Redis distributed idempotency guards.
 - **Internal Ledger Ownership**: Exclusive owner of `dbo.Payments`, `dbo.PaymentTransactions`, and `dbo.PaymentRefunds`. No external service may directly mutate or query these tables.
 
+---
+
+#### 5.7 Kitchen Order Workflow & Real-Time Event Dispatch
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Waitstaff as Waitstaff / Customer POS
+    participant GW as API Gateway (:8000)
+    participant OrderSvc as Order Service (:8007)
+    participant KitchenSvc as Kitchen Service (:8010)
+    participant NotifSvc as Notification Service (:8012)
+    participant DB as MS SQL Server (RestaurantManagementDB)
+    participant KDSClient as Kitchen Display Screen (Socket.IO)
+    participant StaffClient as Waitstaff Handheld (Socket.IO)
+
+    Waitstaff->>GW: POST /api/v1/orders (Place Order)
+    GW->>OrderSvc: Forward order creation
+    OrderSvc->>DB: Execute dbo.usp_Order_Create
+    DB-->>OrderSvc: Order Created (Status: CONFIRMED)
+    
+    OrderSvc->>KitchenSvc: HTTP POST /api/v1/kds (Internal KOT Creation)
+    KitchenSvc->>DB: Execute dbo.usp_KOT_Create (Station Splitting, Idempotent)
+    DB-->>KitchenSvc: KOT Ticket Created (KOTId, KOTNumber, status: NEW)
+    
+    KitchenSvc->>NotifSvc: HTTP POST /api/v1/notifications/internal/broadcast
+    NotifSvc->>DB: Execute dbo.usp_Notification_Create (Persist)
+    NotifSvc->>KDSClient: WebSocket Event 'kot:new' (Room: branch:{id}:kitchen)
+    
+    Note over KitchenSvc,KDSClient: Chef updates ticket/item status
+    KDSClient->>KitchenSvc: PUT /api/v1/kds/:id/items/:itemId/status ('READY')
+    KitchenSvc->>DB: Execute dbo.usp_KOT_UpdateItemStatus (Rollup check)
+    DB-->>KitchenSvc: Item READY, AllOrderKOTsReady = 1
+    
+    KitchenSvc->>OrderSvc: PUT /api/v1/orders/:id/status (Transition to 'READY')
+    OrderSvc->>DB: Execute dbo.usp_Order_UpdateStatus ('READY')
+    
+    KitchenSvc->>NotifSvc: HTTP POST /api/v1/notifications/internal/broadcast
+    NotifSvc->>StaffClient: WebSocket Event 'order:ready' (Room: branch:{id}:waitstaff)
+```
+
+---
+
+#### 6.5 Kitchen Service Contracts (`kitchen-service` :8010)
+- **Downstream Dependency (`order-service` :8007)**:
+  - Invokes `PUT /api/v1/orders/:id/status` using `X-Internal-Service-Key` to advance parent order to `READY` when all kitchen tickets and items for an order have completed preparation.
+  - Never directly executes UPDATE queries against `dbo.Orders` or `dbo.OrderStatusHistory`.
+- **Downstream Dependency (`notification-service` :8012)**:
+  - Invokes `POST /api/v1/notifications/internal/broadcast` with `X-Internal-Service-Key` on every KOT lifecycle event (`kot:new`, `kot:item_update`, `kot:status`, `kot:bumped`, `order:ready`).
+- **Inbound Mesh Endpoints**:
+  - `POST /api/v1/kds`: Invoked by `order-service` to atomically create KOT tickets upon order confirmation.
+  - `POST /api/v1/kds/cancel-by-order`: Invoked by `order-service` to cancel and bump active tickets when an order is cancelled or voided.
+- **Internal Ledger Ownership**: Exclusive owner of `dbo.KitchenOrderTickets` and `dbo.KOTItems`.
+
+---
+
+#### 6.6 Notification Service Contracts (`notification-service` :8012)
+- **Role**: Centralized real-time event aggregation and Socket.IO distribution hub.
+- **Inbound Mesh Endpoints**:
+  - `POST /api/v1/notifications/internal/broadcast`: Universal dispatch endpoint accepting target room, event name, notification payload, and metadata.
+  - `POST /api/v1/notifications/internal/order-status`: Order status change dispatch.
+  - `POST /api/v1/notifications/internal/kot-event`: KOT creation and preparation updates.
+  - `POST /api/v1/notifications/internal/low-stock`: Inventory threshold warnings.
+  - `POST /api/v1/notifications/internal/maintenance/cleanup`: Data retention cleanup.
+- **Persistence Guarantees**: Persists to `dbo.Notifications` with 60-second duplicate suppression before broadcasting to WebSocket rooms.
+- **WebSocket Gateway**: Manages authenticated client connections, JWT validation, and room-level authorization (`branch:{id}:kitchen`, `branch:{id}:waitstaff`, `user:{id}`).
+- **Internal Ledger Ownership**: Exclusive owner of `dbo.Notifications`.
+
+
 
 
 

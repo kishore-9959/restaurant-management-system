@@ -37,9 +37,12 @@ router.post('/', authenticationMiddleware, asyncHandler(orderController.createOr
 
 // 3. Order Item / Status Actions
 router.put(
-  '/:orderId/status',
-  authenticationMiddleware,
-  requireRoles('SUPER_ADMIN', 'RESTAURANT_MANAGER', 'KITCHEN_CHEF', 'WAITSTAFF', 'CASHIER_POS'),
+  ['/:orderId/status', '/api/v1/orders/:orderId/status'],
+  internalOrJwtAuth,
+  (req, res, next) => {
+    if (req.user?.role === 'SYSTEM') return next();
+    return requireRoles('SUPER_ADMIN', 'RESTAURANT_MANAGER', 'KITCHEN_CHEF', 'WAITSTAFF', 'CASHIER_POS')(req, res, next);
+  },
   asyncHandler(orderController.updateStatus.bind(orderController))
 );
 

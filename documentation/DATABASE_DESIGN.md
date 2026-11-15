@@ -320,6 +320,41 @@ All database mutations and queries execute through dedicated, compiled SQL Serve
 130. `dbo.usp_Supplier_Update`: Update vendor contact details and payment terms.
 131. `dbo.usp_Supplier_Delete`: Soft delete vendor with check preventing deletion if linked as primary supplier to active ingredients.
 
+#### 5.8 Payment Service (`database/13_PaymentStoredProcedures.sql`)
+132. `dbo.usp_Payment_Create`: Creates a payment intent in `PENDING` state with unique receipt number generation and external gateway tracking.
+133. `dbo.usp_Payment_GetById`: Multi-recordset fetch returning payment header, transactions history, and refund records.
+134. `dbo.usp_Payment_GetByOrderId`: Retrieves all payment records and status history for a specific order.
+135. `dbo.usp_Payment_List`: Paginated search and filtering of payments by branch, status, method, and date range.
+136. `dbo.usp_Payment_VerifyAndCapture`: Cryptographic signature verification and atomic state transition to `SUCCESS` with ledger recording.
+137. `dbo.usp_Payment_ProcessWebhook`: Asynchronous webhook ingestion with idempotent event tracking and status synchronization.
+138. `dbo.usp_Payment_HandleFailure`: Records failed payment attempts, error codes, and audit logs while preserving order state for retry.
+139. `dbo.usp_Payment_ProcessOfflineSettlement`: Cash/card/UPI counter POS settlement by cashier with cash drawer reconciliation tracking.
+140. `dbo.usp_Payment_CreateRefund`: Atomic partial or full refund initiation with concurrent over-refund guards and status tracking.
+141. `dbo.usp_Payment_UpdateRefundStatus`: Transitions refund status to `PROCESSED` or `FAILED` based on gateway confirmation.
+142. `dbo.usp_Payment_GetRefundById`: Retrieves comprehensive refund details and gateway references.
+143. `dbo.usp_Payment_GetStatus`: Lightweight real-time payment status polling query.
+144. `dbo.usp_Payment_GetReconciliationReport`: Financial reconciliation aggregating payments, settlements, fees, and refunds by payment method.
+
+#### 5.9 Kitchen & Notification Services (`database/14_KitchenNotificationStoredProcedures.sql`)
+146. `dbo.usp_KOT_Create`: Atomic KOT generation, station splitting, sequential KOT number formatting, and idempotent creation guard.
+147. `dbo.usp_KOT_GetById`: Multi-recordset fetch returning ticket header, order info, items snapshot, portion variants, and addons.
+148. `dbo.usp_KOT_GetByOrderId`: Retrieves all KOT tickets and line items across all kitchen stations for an order.
+149. `dbo.usp_KOT_GetActiveBoard`: Real-time KDS display query with elapsed minute calculation and station filtering.
+150. `dbo.usp_KOT_UpdateStatus`: Validates and transitions ticket lifecycle status (`NEW` -> `PREPARING` -> `READY` -> `BUMPED`).
+151. `dbo.usp_KOT_UpdateItemStatus`: Updates item preparation status (`PENDING` -> `COOKING` -> `READY`) with automated parent KOT and order rollup.
+152. `dbo.usp_KOT_Bump`: Bumps completed ticket off active KDS display, setting `BumpedAt = SYSUTCDATETIME()`.
+153. `dbo.usp_KOT_CancelByOrderId`: Automatically cancels and bumps active KOT tickets when an order is cancelled or voided.
+154. `dbo.usp_KOT_GetMetrics`: Computes operational kitchen metrics, average preparation turnaround times, and station workload.
+155. `dbo.usp_KOT_AssignChef`: Logs chef station assignment to `dbo.AuditLogs` and updates `SpecialKitchenNotes`.
+156. `dbo.usp_Notification_Create`: Persists notification with 60-second duplicate suppression window.
+157. `dbo.usp_Notification_GetById`: Single notification record retrieval.
+158. `dbo.usp_Notification_GetByUser`: Filtered and paginated notification inbox query for user or branch.
+159. `dbo.usp_Notification_MarkAsRead`: Marks single notification as read with timestamp.
+160. `dbo.usp_Notification_MarkAllAsRead`: Atomic mark-all-read update for user unread alerts.
+161. `dbo.usp_Notification_GetUnreadCount`: High-speed unread alert counter for UI bell icon badge.
+162. `dbo.usp_Notification_DeleteOlderThan`: Maintenance retention procedure purging read notifications older than N days.
+
+
 
 
 

@@ -366,7 +366,7 @@ class OrderService {
 
     const validTransitions = {
       PENDING: ['CONFIRMED', 'CANCELLED'],
-      CONFIRMED: ['PREPARING', 'CANCELLED'],
+      CONFIRMED: ['PREPARING', 'READY', 'CANCELLED'],
       PREPARING: ['READY', 'CANCELLED'],
       READY: ['SERVED', 'COMPLETED'],
       SERVED: ['COMPLETED'],
@@ -392,8 +392,10 @@ class OrderService {
     // SAGA TRIGGER: Deplete BOM when order is CONFIRMED or moving to PREPARING
     if (newStatus === 'CONFIRMED' || (newStatus === 'PREPARING' && order.orderStatus === 'PENDING')) {
       await this.triggerBomDepletion(order, authContext);
+      await this.triggerKitchenKOT(order, authContext);
     } else if (newStatus === 'CANCELLED' && ['CONFIRMED', 'PREPARING', 'READY'].includes(order.orderStatus)) {
       await this.triggerBomRestitution(order, authContext);
+      await this.triggerKitchenCancel(order, notes || 'Order cancelled', authContext);
     }
 
     return updated;
@@ -442,6 +444,7 @@ class OrderService {
     // SAGA TRIGGER: Restitute inventory if the order was confirmed/preparing/ready
     if (['CONFIRMED', 'PREPARING', 'READY'].includes(order.orderStatus)) {
       await this.triggerBomRestitution(order, authContext);
+      await this.triggerKitchenCancel(order, reason, authContext);
     }
 
     return cancelled;
@@ -514,6 +517,67 @@ class OrderService {
       return res.data;
     } catch (err) {
       logger.error(`[BOM Restitution Failed] Could not restitute inventory for Order #${order.orderNumber}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Invokes Kitchen Service to generate KOT ticket when an order is confirmed or moving to preparation
+   */
+  async triggerKitchenKOT(order, authContext = {}) {
+    if (!order) return;
+    try {
+      const payload = {
+        branchId: order.branchId,
+        orderId: order.orderId,
+        kitchenStation: 'MAIN_KITCHEN',
+        specialKitchenNotes: order.customerNotes || null,
+      };
+
+      const internalKey = config.security?.internalServiceKey || config.internalServiceKey;
+      const res = await httpClient.post(
+        `${config.urls?.kitchenService || 'http://localhost:8010'}/api/v1/kds/tickets`,
+        payload,
+        {
+          headers: {
+            'x-internal-service-key': internalKey,
+            'x-user-id': String(authContext.userId || 'system'),
+            'x-user-role': 'SYSTEM',
+            ...(authContext.token && { Authorization: `Bearer ${authContext.token}` }),
+          },
+          timeout: 5000,
+        }
+      );
+      logger.info(`[KOT Generation] Successfully created KOT for Order #${order.orderNumber} (OrderId: ${order.orderId})`);
+      return res.data;
+    } catch (err) {
+      logger.warn(`[KOT Generation Failed] Could not create KOT for Order #${order.orderNumber}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Invokes Kitchen Service to cancel and bump active KOT tickets when an order is cancelled
+   */
+  async triggerKitchenCancel(order, reason, authContext = {}) {
+    if (!order) return;
+    try {
+      const internalKey = config.security?.internalServiceKey || config.internalServiceKey;
+      const res = await httpClient.post(
+        `${config.urls?.kitchenService || 'http://localhost:8010'}/api/v1/kds/orders/${order.orderId}/cancel`,
+        { reason: reason || 'Order cancelled' },
+        {
+          headers: {
+            'x-internal-service-key': internalKey,
+            'x-user-id': String(authContext.userId || 'system'),
+            'x-user-role': 'SYSTEM',
+            ...(authContext.token && { Authorization: `Bearer ${authContext.token}` }),
+          },
+          timeout: 5000,
+        }
+      );
+      logger.info(`[KOT Cancellation] Successfully cancelled active KOTs for Order #${order.orderNumber}`);
+      return res.data;
+    } catch (err) {
+      logger.warn(`[KOT Cancellation Failed] Could not cancel KOT for Order #${order.orderNumber}: ${err.message}`);
     }
   }
 

@@ -125,7 +125,7 @@ const rbacRules = [
   },
   {
     pattern: /^\/api\/v1\/kds(\/.*)?$/,
-    allowedRoles: ['KITCHEN_CHEF', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+    allowedRoles: ['KITCHEN_CHEF', 'KITCHEN_STAFF', 'RESTAURANT_MANAGER', 'SUPER_ADMIN', 'WAITSTAFF', 'CASHIER_POS', 'POS_OPERATOR'],
   },
   {
     pattern: /^\/api\/v1\/shifts(\/.*)?$/,

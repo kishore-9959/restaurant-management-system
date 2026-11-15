@@ -19,6 +19,7 @@ const {
 
 const healthRoutes = require('./routes/health');
 const internalRoutes = require('./routes/internal');
+const notificationRoutes = require('./routes/notification.routes');
 
 const logger = createServiceLogger('notification-service');
 const app = express();
@@ -32,6 +33,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(healthRoutes);
 app.use('/api/v1/notifications/internal', internalRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/', notificationRoutes);
 
 app.use((req, res) => {
   return errorResponse(res, {
