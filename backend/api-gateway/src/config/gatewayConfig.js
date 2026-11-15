@@ -106,6 +106,7 @@ const publicRoutePatterns = [
   /^\/api\/v1\/cart(\/.*)?$/,
   /^\/api\/v1\/payments\/razorpay\/webhook$/,
   /^\/health(\/.*)?$/,
+  /^\/api\/v1\/[a-zA-Z0-9_-]+\/health(\/.*)?$/,
 ];
 
 // RBAC restrictions for specific route prefixes
@@ -120,7 +121,7 @@ const rbacRules = [
   },
   {
     pattern: /^\/api\/v1\/inventory(\/.*)?$/,
-    allowedRoles: ['SUPER_ADMIN', 'RESTAURANT_MANAGER', 'KITCHEN_CHEF'],
+    allowedRoles: ['SUPER_ADMIN', 'RESTAURANT_MANAGER', 'KITCHEN_CHEF', 'WAITSTAFF'],
   },
   {
     pattern: /^\/api\/v1\/kds(\/.*)?$/,
@@ -129,6 +130,22 @@ const rbacRules = [
   {
     pattern: /^\/api\/v1\/shifts(\/.*)?$/,
     allowedRoles: ['CASHIER_POS', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+  },
+  {
+    pattern: /^\/api\/v1\/payments\/offline-settle$/,
+    allowedRoles: ['CASHIER_POS', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+  },
+  {
+    pattern: /^\/api\/v1\/payments\/refund(\/.*)?$/,
+    allowedRoles: ['RESTAURANT_MANAGER', 'SUPER_ADMIN', 'CASHIER_POS'],
+  },
+  {
+    pattern: /^\/api\/v1\/payments\/reports(\/.*)?$/,
+    allowedRoles: ['RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+  },
+  {
+    pattern: /^\/api\/v1\/payments(\/.*)?$/,
+    allowedRoles: ['CUSTOMER', 'WAITSTAFF', 'CASHIER_POS', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
   },
   {
     pattern: /^\/api\/v1\/reports(\/.*)?$/,

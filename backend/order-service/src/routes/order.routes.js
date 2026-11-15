@@ -7,8 +7,19 @@
 
 const express = require('express');
 const router = express.Router();
-const { authenticationMiddleware, requireRoles, asyncHandler } = require('@rms/shared');
+const { config, authenticationMiddleware, requireRoles, asyncHandler } = require('@rms/shared');
 const orderController = require('../controllers/order.controller');
+
+// Allows internal service mesh call with X-Internal-Service-Key or staff JWT
+const internalOrJwtAuth = (req, res, next) => {
+  const providedKey = req.headers['x-internal-service-key'];
+  const expectedKey = config.security?.internalServiceKey || config.internalServiceKey;
+  if (providedKey && providedKey === expectedKey) {
+    req.user = { userId: 1, role: 'SYSTEM' };
+    return next();
+  }
+  return authenticationMiddleware(req, res, next);
+};
 
 // 1. Specific static sub-paths (Must precede parameterized :orderId)
 router.get('/number/:orderNumber', authenticationMiddleware, asyncHandler(orderController.getOrderByNumber.bind(orderController)));
@@ -34,6 +45,11 @@ router.put(
 
 router.post('/:orderId/cancel', authenticationMiddleware, asyncHandler(orderController.cancelOrder.bind(orderController)));
 router.get('/:orderId/history', authenticationMiddleware, asyncHandler(orderController.getOrderHistory.bind(orderController)));
+router.patch(
+  ['/:orderId/payment-status', '/api/v1/orders/:orderId/payment-status'],
+  internalOrJwtAuth,
+  asyncHandler(orderController.updatePaymentStatus.bind(orderController))
+);
 
 // 4. Order by ID
 router.get('/:orderId', authenticationMiddleware, asyncHandler(orderController.getOrderById.bind(orderController)));

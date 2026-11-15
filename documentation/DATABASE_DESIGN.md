@@ -293,6 +293,34 @@ All database mutations and queries execute through dedicated, compiled SQL Serve
 105. `dbo.usp_Order_Cancel`: Safe cancellation procedure releasing occupied tables back to `AVAILABLE` and auditing cancellation reason into `OrderStatusHistory`.
 106. `dbo.usp_Order_GetStatusHistory`: Retrieve complete chronological audit trail of state transitions for an order.
 
+#### 5.7 Inventory & Recipe BOM Service (`database/12_InventoryStoredProcedures.sql`)
+107. `dbo.usp_Inventory_Ingredient_Create`: Create new raw material ingredient with branch-scoped unique code enforcement, initial stock logging, and supplier association.
+108. `dbo.usp_Inventory_Ingredient_GetById`: Single ingredient retrieval joining primary supplier details.
+109. `dbo.usp_Inventory_Ingredient_List`: Paginated search and filtering by branch, category, active status, and low-stock flag.
+110. `dbo.usp_Inventory_Ingredient_Update`: Safe update of name, category, unit, safety thresholds, cost, and vendor.
+111. `dbo.usp_Inventory_Ingredient_SetStatus`: Toggle ingredient active status for kitchen usage.
+112. `dbo.usp_Inventory_Ingredient_Delete`: Soft delete with validation ensuring no active recipe BOM dependencies exist.
+113. `dbo.usp_Inventory_StockIn`: Stock-in / purchase receipt restock with ledger audit transaction recording and weighted moving average cost updating.
+114. `dbo.usp_Inventory_StockOut`: Stock-out / wastage / damage / spoilage recording with balance decrementing and audit logging.
+115. `dbo.usp_Inventory_StockAdjust`: Physical stock audit reconciliation computing variance and updating balance.
+116. `dbo.usp_Inventory_StockTransfer`: Atomic two-phase inter-branch stock transfer with source deduction, destination receipt, and paired ledger transactions.
+117. `dbo.usp_Inventory_BOM_CheckStock`: Multi-item stock availability check simulating recipe requirements against live branch stock without modifying balances.
+118. `dbo.usp_Inventory_BOM_Deplete`: Idempotent order-saga stock depletion deducting ingredient balances based on recipe BOMs and recording `CONSUMPTION` audit transactions.
+119. `dbo.usp_Inventory_BOM_Restitute`: Compensating transaction restoring deducted stock on order cancellation and recording `RESTITUTION` audit transactions.
+120. `dbo.usp_Inventory_GetLowStockAlerts`: Identify ingredients breaching reorder levels or minimum safety thresholds with severity rating (`CRITICAL` vs `WARNING`).
+121. `dbo.usp_Inventory_GetTransactions`: Paginated chronological ledger transaction history with branch, ingredient, date, and type filters.
+122. `dbo.usp_Inventory_GetValuationReport`: Aggregate inventory asset valuation grouped by category with summary metrics.
+123. `dbo.usp_Inventory_GetConsumptionReport`: Aggregate consumption volume, total cost, and wastage losses over configurable time horizons.
+124. `dbo.usp_Recipe_CreateOrUpdate`: Atomic creation/replacement of recipe BOM and line ingredients from JSON payload for menu items and variants.
+125. `dbo.usp_Recipe_GetByMenuItem`: Multi-recordset recipe retrieval returning dish header, yield portions, preparation notes, and ingredient requirements.
+126. `dbo.usp_Recipe_Delete`: Soft deactivate recipe BOM for menu items.
+127. `dbo.usp_Supplier_Create`: Register raw material vendor with unique code check.
+128. `dbo.usp_Supplier_GetById`: Retrieve vendor profile and payment terms.
+129. `dbo.usp_Supplier_List`: Paginated supplier listing with search and active filtering.
+130. `dbo.usp_Supplier_Update`: Update vendor contact details and payment terms.
+131. `dbo.usp_Supplier_Delete`: Soft delete vendor with check preventing deletion if linked as primary supplier to active ingredients.
+
+
 
 
 

@@ -236,7 +236,38 @@ sequenceDiagram
 
 ---
 
-### 6. Phase 7 Inter-Service REST API Contracts
+#### 5.5 Order -> Inventory BOM Depletion & Restitution Saga Workflow
+```mermaid
+sequenceDiagram
+    autonumber
+    participant OrderSvc as Order Service (:8007)
+    participant InvSvc as Inventory Service (:8009)
+    participant NotifSvc as Notification Service (:8012)
+    participant DB as MS SQL Server (RestaurantManagementDB)
+
+    Note over OrderSvc,InvSvc: Saga Step 1: Order Confirmation -> Stock Depletion
+    OrderSvc->>OrderSvc: Transition OrderStatus to 'CONFIRMED'
+    OrderSvc->>InvSvc: HTTP POST /api/v1/inventory/bom/deplete (branchId, orderId, orderNumber, items)
+    InvSvc->>DB: Execute usp_Inventory_BOM_Deplete (idempotent check & consumption ledger)
+    DB-->>InvSvc: Result Sets (DepletedCount, LowStockTriggered, LowStockAlerts)
+    opt LowStockTriggered is true
+        InvSvc->>NotifSvc: HTTP POST /api/v1/notifications/internal/broadcast ('inventory:low_stock')
+    end
+    InvSvc-->>OrderSvc: HTTP 200 OK (Depletion confirmed)
+
+    Note over OrderSvc,InvSvc: Saga Step 2: Compensating Transaction (Order Cancellation)
+    opt Order is Cancelled while Confirmed/Preparing/Ready
+        OrderSvc->>OrderSvc: Transition OrderStatus to 'CANCELLED'
+        OrderSvc->>InvSvc: HTTP POST /api/v1/inventory/bom/restitute (branchId, orderId, orderNumber)
+        InvSvc->>DB: Execute usp_Inventory_BOM_Restitute (restitutes balances & ledger log)
+        DB-->>InvSvc: Result Sets (RestoredCount, Message)
+        InvSvc-->>OrderSvc: HTTP 200 OK (Stock Restituted)
+    end
+```
+
+---
+
+### 6. Phase 7 & 8 Inter-Service REST API Contracts
 
 #### 6.1 Cart Service Contracts (`cart-service` :8006)
 - **Downstream Dependency**: Calls `menu-service` (:8005) via `GET /api/v1/menu/items/:id` to authoritatively validate dish prices, variants, addon pricing, and item availability before mutating cart records.
@@ -254,5 +285,63 @@ sequenceDiagram
   - `PATCH /api/v1/restaurant/tables/:tableId/status`: Updates table status to `OCCUPIED` upon dine-in placement, and `AVAILABLE` upon completion or cancellation.
 - **Calls `user-service` (:8002)**:
   - `GET /api/v1/users/addresses/:addressId`: Validates customer delivery address ownership and active status.
+- **Calls `inventory-service` (:8009)**:
+  - `POST /api/v1/inventory/bom/deplete`: Deducts ingredient stock when order transitions to `CONFIRMED` or `PREPARING`.
+  - `POST /api/v1/inventory/bom/restitute`: Restores consumed ingredients when order transitions to `CANCELLED`.
+
+#### 6.3 Inventory Service Contracts (`inventory-service` :8009)
+- **Inbound Mesh Endpoints**:
+  - `POST /api/v1/inventory/bom/check`: Pre-flight check validating ingredient inventory availability for draft or placing orders.
+  - `POST /api/v1/inventory/bom/deplete`: Idempotent stock depletion invoked by `order-service` upon order confirmation.
+  - `POST /api/v1/inventory/bom/restitute`: Compensating saga transaction restoring stock for cancelled orders.
+- **Outbound Calls**:
+  - Calls `notification-service` (:8012) via `POST /api/v1/notifications/internal/broadcast` when an ingredient's balance breaches its configured `ReorderLevel` or `MinimumStockLevel`.
+
+---
+
+#### 5.6 Payment Lifecycle & Order Settlement Saga Workflow
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Customer as Customer / POS Cashier
+    participant GW as API Gateway (:8000)
+    participant PaySvc as Payment Service (:8008)
+    participant Razorpay as Razorpay API
+    participant DB as MS SQL Server (RestaurantManagementDB)
+    participant OrderSvc as Order Service (:8007)
+
+    Customer->>GW: POST /api/v1/payments/razorpay/create-order (orderId, branchId)
+    GW->>PaySvc: Forward order intent
+    PaySvc->>OrderSvc: GET /api/v1/orders/:id (Validate order grandTotal & status)
+    OrderSvc-->>PaySvc: Order details (grandTotal, status)
+    PaySvc->>Razorpay: Create order intent (amount in paise)
+    Razorpay-->>PaySvc: gatewayOrderId (order_xxxx)
+    PaySvc->>DB: Execute usp_Payment_Create (status: PENDING)
+    DB-->>PaySvc: Created Payment Header
+    PaySvc-->>GW: HTTP 201 Created (paymentId, gatewayOrderId, razorpayKeyId)
+    GW-->>Customer: HTTP 201 Created
+
+    Customer->>Customer: Complete payment via Razorpay modal
+    Customer->>GW: POST /api/v1/payments/razorpay/verify (gatewayPaymentId, signature)
+    GW->>PaySvc: Forward verify payload
+    PaySvc->>PaySvc: Cryptographic timingSafeEqual HMAC verification
+    PaySvc->>DB: Execute usp_Payment_VerifyAndCapture (status: SUCCESS)
+    DB-->>PaySvc: Captured Payment
+    PaySvc->>OrderSvc: PATCH /api/v1/orders/:id/payment-status (PAID, amount, ref)
+    OrderSvc->>DB: Update Orders.PaymentStatus = 'PAID' (Auto-advance dine-in to 'COMPLETED')
+    OrderSvc-->>PaySvc: HTTP 200 OK
+    PaySvc-->>GW: HTTP 200 OK (Captured payment)
+    GW-->>Customer: HTTP 200 OK
+```
+
+---
+
+#### 6.4 Payment Service Contracts (`payment-service` :8008)
+- **Downstream Dependency**: Calls `order-service` (:8007) via `GET /api/v1/orders/:id` to authoritatively validate order amounts before online intent creation.
+- **Outbound Mesh Update**: Invokes `PATCH /api/v1/orders/:orderId/payment-status` on `order-service` (:8007) with internal mesh header `X-Internal-Service-Key` to synchronize payment state (`PAID`, `FAILED`) and auto-complete dine-in orders upon settlement.
+- **Inbound Public Webhook Ingress**: Receives unauthenticated Razorpay cloud notifications at `POST /api/v1/payments/razorpay/webhook`, verified via `X-Razorpay-Signature` with Redis distributed idempotency guards.
+- **Internal Ledger Ownership**: Exclusive owner of `dbo.Payments`, `dbo.PaymentTransactions`, and `dbo.PaymentRefunds`. No external service may directly mutate or query these tables.
+
+
 
 

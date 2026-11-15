@@ -389,6 +389,13 @@ class OrderService {
       notes,
     });
 
+    // SAGA TRIGGER: Deplete BOM when order is CONFIRMED or moving to PREPARING
+    if (newStatus === 'CONFIRMED' || (newStatus === 'PREPARING' && order.orderStatus === 'PENDING')) {
+      await this.triggerBomDepletion(order, authContext);
+    } else if (newStatus === 'CANCELLED' && ['CONFIRMED', 'PREPARING', 'READY'].includes(order.orderStatus)) {
+      await this.triggerBomRestitution(order, authContext);
+    }
+
     return updated;
   }
 
@@ -432,7 +439,82 @@ class OrderService {
       cancelReason: reason,
     });
 
+    // SAGA TRIGGER: Restitute inventory if the order was confirmed/preparing/ready
+    if (['CONFIRMED', 'PREPARING', 'READY'].includes(order.orderStatus)) {
+      await this.triggerBomRestitution(order, authContext);
+    }
+
     return cancelled;
+  }
+
+  /**
+   * Invokes Inventory Service to deplete Bill of Materials (BOM) stock for an order
+   */
+  async triggerBomDepletion(order, authContext = {}) {
+    if (!order || !Array.isArray(order.items) || order.items.length === 0) return;
+    try {
+      const payload = {
+        branchId: order.branchId,
+        orderId: order.orderId,
+        orderNumber: order.orderNumber,
+        items: order.items.map((i) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+        })),
+      };
+
+      const internalKey = config.security?.internalServiceKey || config.internalServiceKey;
+      const res = await httpClient.post(
+        `${config.urls.inventoryService}/api/v1/inventory/bom/deplete`,
+        payload,
+        {
+          headers: {
+            'x-internal-service-key': internalKey,
+            'x-user-id': String(authContext.userId || 'system'),
+            'x-user-role': 'SYSTEM',
+            ...(authContext.token && { Authorization: `Bearer ${authContext.token}` }),
+          },
+          timeout: 5000,
+        }
+      );
+      logger.info(`[BOM Depletion] Successfully depleted inventory for Order #${order.orderNumber} (OrderId: ${order.orderId})`);
+      return res.data;
+    } catch (err) {
+      logger.error(`[BOM Depletion Failed] Could not deplete inventory for Order #${order.orderNumber}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Invokes Inventory Service to restitute Bill of Materials (BOM) stock when an order is cancelled
+   */
+  async triggerBomRestitution(order, authContext = {}) {
+    if (!order) return;
+    try {
+      const payload = {
+        branchId: order.branchId,
+        orderId: order.orderId,
+        orderNumber: order.orderNumber,
+      };
+
+      const internalKey = config.security?.internalServiceKey || config.internalServiceKey;
+      const res = await httpClient.post(
+        `${config.urls.inventoryService}/api/v1/inventory/bom/restitute`,
+        payload,
+        {
+          headers: {
+            'x-internal-service-key': internalKey,
+            'x-user-id': String(authContext.userId || 'system'),
+            'x-user-role': 'SYSTEM',
+            ...(authContext.token && { Authorization: `Bearer ${authContext.token}` }),
+          },
+          timeout: 5000,
+        }
+      );
+      logger.info(`[BOM Restitution] Successfully restituted inventory for Order #${order.orderNumber} (OrderId: ${order.orderId})`);
+      return res.data;
+    } catch (err) {
+      logger.error(`[BOM Restitution Failed] Could not restitute inventory for Order #${order.orderNumber}: ${err.message}`);
+    }
   }
 
   /**
@@ -441,6 +523,38 @@ class OrderService {
   async getOrderHistory(orderId, authContext = {}) {
     const order = await this.getOrderById(orderId, authContext);
     return await orderRepository.getStatusHistory(order.orderId);
+  }
+
+  /**
+   * Synchronize order payment status from Payment Service
+   */
+  async updatePaymentStatus({ orderId, paymentStatus, notes = null, changedByUserId = null }) {
+    const existing = await orderRepository.getById(orderId);
+    if (!existing) {
+      const err = new Error(`Order #${orderId} not found.`);
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const updated = await orderRepository.updatePaymentStatus({
+      orderId,
+      paymentStatus,
+      notes,
+      changedByUserId,
+    });
+
+    // If order is paid in full and is dine-in in SERVED status, advance to COMPLETED
+    if (paymentStatus === 'PAID') {
+      if (['SERVED', 'READY'].includes(existing.orderStatus)) {
+        try {
+          await this.updateOrderStatus(orderId, 'COMPLETED', changedByUserId, 'Order completed on full payment settlement');
+        } catch (e) {
+          logger.warn(`Could not advance order #${orderId} to COMPLETED: ${e.message}`);
+        }
+      }
+    }
+
+    return updated;
   }
 }
 

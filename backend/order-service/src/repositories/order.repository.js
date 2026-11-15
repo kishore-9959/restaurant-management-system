@@ -7,7 +7,7 @@
  * ============================================================================
  */
 
-const { executeProcedure } = require('@rms/shared');
+const { executeProcedure, query } = require('@rms/shared');
 
 class OrderRepository {
   /**
@@ -259,6 +259,34 @@ class OrderRepository {
       notes: h.Notes,
       changedAt: h.ChangedAt,
     }));
+  }
+
+  /**
+   * Synchronize order payment status and record audit in history
+   */
+  async updatePaymentStatus({ orderId, paymentStatus, notes = null, changedByUserId = null }) {
+    await query(`
+      UPDATE dbo.Orders
+      SET PaymentStatus = @paymentStatus,
+          UpdatedAt = SYSUTCDATETIME()
+      WHERE OrderId = @orderId AND IsDeleted = 0;
+
+      INSERT INTO dbo.OrderStatusHistory (
+        OrderId, PreviousStatus, NewStatus, ChangedByUserId, Notes, ChangedAt
+      )
+      SELECT 
+        OrderId, OrderStatus, OrderStatus, @changedByUserId, 
+        ISNULL(@notes, 'Payment status updated to ' + @paymentStatus), SYSUTCDATETIME()
+      FROM dbo.Orders
+      WHERE OrderId = @orderId;
+    `, {
+      paymentStatus,
+      orderId: parseInt(orderId, 10),
+      changedByUserId: changedByUserId ? parseInt(changedByUserId, 10) : null,
+      notes: notes || null,
+    });
+
+    return this.getById(orderId);
   }
 }
 

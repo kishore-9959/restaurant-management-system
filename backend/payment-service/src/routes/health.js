@@ -8,10 +8,10 @@
 
 const express = require('express');
 const router = express.Router();
-const { config, testDbConnection, successResponse } = require('@rms/shared');
+const { config, testDbConnection, testRedisConnection, successResponse } = require('@rms/shared');
 
 // 1. Liveness Probe: Verifies the Node.js process is responsive
-router.get('/health/live', (req, res) => {
+router.get(['/health/live', '/api/v1/payments/health/live'], (req, res) => {
   const mem = process.memoryUsage();
   return successResponse(res, {
     statusCode: 200,
@@ -30,10 +30,21 @@ router.get('/health/live', (req, res) => {
   });
 });
 
-// 2. Readiness Probe: Verifies database connectivity
+// 2. Readiness Probe: Verifies database and redis connectivity
 async function checkReadiness(req, res) {
-  const dbHealth = await testDbConnection();
+  const [dbHealth, redisHealth] = await Promise.all([
+    testDbConnection(),
+    testRedisConnection(),
+  ]);
+
   const isReady = dbHealth.healthy === true;
+
+  // Masked check for razorpay credentials presence
+  const razorpayConfigured = Boolean(
+    config.razorpay?.keyId &&
+    config.razorpay?.keySecret &&
+    config.razorpay?.webhookSecret
+  );
 
   return successResponse(res, {
     statusCode: isReady ? 200 : 503,
@@ -46,12 +57,13 @@ async function checkReadiness(req, res) {
       timestamp: new Date().toISOString(),
       dependencies: {
         database: dbHealth,
+        redis: redisHealth,
+        razorpayConfigured,
       },
     },
   });
 }
 
-router.get('/health/ready', checkReadiness);
-router.get('/health', checkReadiness);
+router.get(['/health/ready', '/health', '/api/v1/payments/health/ready', '/api/v1/payments/health'], checkReadiness);
 
 module.exports = router;

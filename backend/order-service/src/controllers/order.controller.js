@@ -284,6 +284,44 @@ class OrderController {
       });
     }
   }
+
+  /**
+   * PATCH /api/v1/orders/:orderId/payment-status
+   * Internal mesh endpoint for Payment Service synchronization
+   */
+  async updatePaymentStatus(req, res) {
+    const { orderId } = req.params;
+    const { paymentStatus, notes } = req.body;
+    const changedByUserId = req.user?.userId || req.user?.id || req.userId || null;
+
+    if (!paymentStatus) {
+      return errorResponse(res, {
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Field "paymentStatus" is required.',
+      });
+    }
+
+    try {
+      const updated = await orderService.updatePaymentStatus({
+        orderId,
+        paymentStatus,
+        notes,
+        changedByUserId,
+      });
+
+      return successResponse(res, {
+        message: `Order #${orderId} payment status updated to ${paymentStatus}.`,
+        data: updated,
+      });
+    } catch (error) {
+      return errorResponse(res, {
+        statusCode: error.statusCode || 500,
+        code: error.code || 'PAYMENT_STATUS_UPDATE_FAILED',
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new OrderController();

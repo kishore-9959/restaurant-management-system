@@ -7,10 +7,19 @@
  */
 
 const { errorResponse } = require('@rms/shared');
-const { rbacRules } = require('../config/gatewayConfig');
+const { rbacRules, publicRoutePatterns } = require('../config/gatewayConfig');
+
+function isPublicRoute(path) {
+  return publicRoutePatterns.some((pattern) => pattern.test(path));
+}
 
 function rbacGuard(req, res, next) {
   const currentPath = req.path;
+
+  // Public whitelisted endpoints do not require role checks
+  if (isPublicRoute(currentPath)) {
+    return next();
+  }
 
   const matchedRule = rbacRules.find((rule) => rule.pattern.test(currentPath));
   if (!matchedRule) {

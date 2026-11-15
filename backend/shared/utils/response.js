@@ -28,6 +28,7 @@ function successResponse(res, arg2 = {}, arg3 = null, arg4 = 'Operation complete
     data = null,
     message = 'Operation completed successfully',
     meta = null,
+    pagination = null,
     correlationId = null,
   } = opts;
 
@@ -38,6 +39,7 @@ function successResponse(res, arg2 = {}, arg3 = null, arg4 = 'Operation complete
     data,
     message,
     ...(meta && { meta }),
+    ...(pagination && { pagination }),
     correlationId: cid,
     timestamp: new Date().toISOString(),
   };

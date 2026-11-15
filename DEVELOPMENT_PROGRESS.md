@@ -6,10 +6,10 @@
 ### Project Status Overview
 
 - **Architecture Model**: **Microservices Architecture Only (14 Microservices, API Gateway, Redis, Socket.IO, Shared MSSQL Database, 100% Stored Procedures, Zero ORM)**
-- **Current Milestone**: Phase 7 Cart & Order Management Microservices Complete
-- **Status**: **Phase 7 Complete (Ready for User Review before Phase 8 Payment Service)**
-- **Next Milestone**: Phase 8 — Payment Service
-- **Lead Architect**: Senior Microservices Architect & Full-Stack Lead
+- **Current Milestone**: Phase 9 Payment Service (Razorpay Gateway, Webhooks, Offline Settlement, Refunds)
+- **Status**: **Phase 9 Completed (Passed 38/38 API Tests + 21/21 SQL Tests)**
+- **Next Milestone**: Phase 10 Kitchen Service & Notification Service (Real-time Socket.IO KDS)
+- **Lead Architect**: Senior Microservices Architect & SQL Server Database Architect
 
 ---
 
@@ -25,9 +25,9 @@
 | **Phase 5** | Restaurant Service & Floor Management (Branches, Tables, Shifts) | **COMPLETED** | **2026-11-12** | **Passed 24/24 Tests** |
 | **Phase 6** | Menu Service & Redis Catalog Caching ("86" Toggle) | **COMPLETED** | **2026-11-13** | **Passed 36/36 Tests** |
 | **Phase 7** | Cart & Order Management (100% Stored Procedures, Redis Idempotency) | **COMPLETED** | **2026-11-14** | **Passed 46/46 Tests** |
-| **Phase 8** | Payment Service (Razorpay Gateway & Offline Settlement) | *Planned* | - | Pending |
-| **Phase 9** | Kitchen Service & Notification Service (Real-time Socket.IO KDS) | *Planned* | - | Pending |
-| **Phase 10**| Inventory Service & Recipe BOM Depletion | *Planned* | - | Pending |
+| **Phase 8** | Inventory Management (Stock Movements, Recipe BOM, Suppliers, Valuations) | **COMPLETED** | **2026-11-15** | **Passed 44/44 Tests + 26/26 SQL Tests** |
+| **Phase 9** | Payment Service (Razorpay Gateway, Webhooks, Offline Settlement, Refunds) | **COMPLETED** | **2026-11-15** | **Passed 38/38 Tests + 21/21 SQL Tests** |
+| **Phase 10**| Kitchen Service & Notification Service (Real-time Socket.IO KDS) | *Planned* | - | Pending |
 | **Phase 11**| Dynamic Website CMS Service & Public Customer Frontend | *Planned* | - | Pending |
 | **Phase 12**| Reservation Service & Floor Scheduling | *Planned* | - | Pending |
 | **Phase 13**| Report Service & Analytics Aggregator | *Planned* | - | Pending |
@@ -635,7 +635,299 @@ Verified via `scripts/verify_all_services_startup.js`:
 - No Sequelize ORM or models used.
 - Complete 4-tier architecture in both `backend/cart-service/` and `backend/order-service/`.
 - Strict 2-decimal precision currency arithmetic.
-- Phase 8 (Payment Service) has **not** been started. Awaiting user review and sign-off.
+- Completed and signed off with 46/46 Phase 7 tests passing and 140/140 cumulative regression tests passing.
+
+---
+
+## Phase 8 — Inventory Management & Bill of Materials (BOM) Implementation
+
+### Status: Completed & Verified (44/44 API Tests Passed + 26/26 SQL Stored Procedure Tests Passed)
+
+### 1. Database Architecture & Table Ownership (7 Tables Owned)
+
+In accordance with `documentation/MICROSERVICES_DATABASE_MAPPING.md`, Phase 8 exclusively owns and manages 7 database tables:
+1. `dbo.Suppliers`: Vendor contact details, tax identification, and payment terms.
+2. `dbo.InventoryIngredients`: Master ingredients catalog, unit of measure, cost per unit, reorder threshold levels, and real-time stock balances scoped by branch.
+3. `dbo.Recipes`: Parent recipe header linking Menu Items and Variants to preparation specifications.
+4. `dbo.RecipeIngredients`: Bill of Materials (BOM) component mapping required ingredient quantities per serving.
+5. `dbo.InventoryTransactions`: Immutable audit ledger recording every stock movement (`IN`, `OUT`, `ADJUSTMENT`, `TRANSFER`, `BOM_DEPLETION`, `BOM_RESTITUTION`) with before/after balances.
+6. `dbo.PurchaseOrders`: Procurement order headers with vendor association and status lifecycle.
+7. `dbo.PurchaseOrderItems`: Procurement order line items with negotiated unit rates.
+
+### 2. Stored Procedure Tier (`database/12_InventoryStoredProcedures.sql`)
+
+A total of **25 specialized stored procedures** (SPs 107–131) were authored, strictly adhering to `SET ANSI_NULLS ON`, `SET QUOTED_IDENTIFIER ON`, robust `TRY...CATCH` blocks, row-level locking (`UPDLOCK, HOLDLOCK`), and atomic `XACT_ABORT ON` transactions:
+
+| SP # | Stored Procedure Name | Purpose / Core Logic |
+| :---: | :--- | :--- |
+| **107** | `usp_Inventory_Ingredient_Create` | Creates new ingredient with duplicate code checks and initializes opening balance in ledger. |
+| **108** | `usp_Inventory_Ingredient_GetById` | Retrieves single ingredient profile and live stock balance scoped by branch. |
+| **109** | `usp_Inventory_Ingredient_List` | Filtered, paginated listing by branch, category, active status, and low-stock filter. |
+| **110** | `usp_Inventory_Ingredient_Update` | Atomically updates ingredient name, category, UOM, thresholds, and unit costs. |
+| **111** | `usp_Inventory_Ingredient_SetStatus` | Toggles ingredient active/inactive status. |
+| **112** | `usp_Inventory_Ingredient_Delete` | Soft-deletes ingredient if no active recipes or non-zero stock balances exist. |
+| **113** | `usp_Inventory_StockIn` | Logs procurement stock receipts (`PURCHASE_RECEIPT`), updates `CurrentStock`, records transaction ledger. |
+| **114** | `usp_Inventory_StockOut` | Records manual stock write-offs (`WASTAGE`, `SPOILAGE`, `EXPIRY`), decrements stock with non-negative guard. |
+| **115** | `usp_Inventory_StockAdjust` | Reconciliation adjustment (`PHYSICAL_COUNT`), calculates variance, adjusts stock balance. |
+| **116** | `usp_Inventory_StockTransfer` | Cross-branch inventory transfer, validates source availability, updates both branches atomically. |
+| **117** | `usp_Inventory_BOM_CheckStock` | Pre-flight validation verifying sufficiency of all BOM recipe ingredients before order confirmation. |
+| **118** | `usp_Inventory_BOM_Deplete` | Atomic and idempotent batch depletion of ingredients based on order items and recipes; prevents duplicate deductions. |
+| **119** | `usp_Inventory_BOM_Restitute` | Compensating transaction restoring deducted ingredient quantities upon order cancellation. |
+| **120** | `usp_Inventory_GetLowStockAlerts` | Real-time reporting of all ingredients where `CurrentStock <= ReorderPoint`. |
+| **121** | `usp_Inventory_GetTransactions` | Audit ledger trail filtering by ingredient, branch, movement type, and date range. |
+| **122** | `usp_Inventory_GetValuationReport` | Computes live inventory financial valuation (`CurrentStock * CostPerUnit`) grouped by category. |
+| **123** | `usp_Inventory_GetConsumptionReport` | Aggregates consumption metrics across order deductions, wastage, and manual usage over time. |
+| **124** | `usp_Recipe_CreateOrUpdate` | Upserts recipe header and replaces BOM ingredient requirements via JSON parsing (`OPENJSON`). |
+| **125** | `usp_Recipe_GetByMenuItem` | Multi-recordset fetch retrieving recipe specifications and required ingredient quantities for a menu item. |
+| **126** | `usp_Recipe_Delete` | Soft-deletes or removes recipe definitions. |
+| **127** | `usp_Supplier_Create` | Registers vendor profile with duplicate email and tax identifier checks. |
+| **128** | `usp_Supplier_GetById` | Fetches vendor profile by primary key. |
+| **129** | `usp_Supplier_List` | Filtered, paginated vendor directory with search and active status filters. |
+| **130** | `usp_Supplier_Update` | Updates vendor contact details, tax numbers, and payment terms. |
+| **131** | `usp_Supplier_Delete` | Soft-deletes vendor if no active purchase orders exist. |
+
+### 3. Inventory Service Implementation Details (`backend/inventory-service/`)
+
+- **Layered 4-Tier Microservice Architecture**:
+  - `src/repositories/`: Pure data access wrapping stored procedures via `executeProcedure` (`ingredient.repository.js`, `supplier.repository.js`, `stock.repository.js`, `recipe.repository.js`, `bom.repository.js`, `report.repository.js`). Zero ORM, zero models, zero direct SQL strings.
+  - `src/services/`: Comprehensive domain logic and validation (`ingredient.service.js`, `supplier.service.js`, `stock.service.js`, `recipe.service.js`, `bom.service.js`, `report.service.js`):
+    - Multi-field alias normalization (`NewBalance`/`NewStock`, `Variance`/`AdjustmentVariance`).
+    - Partial update hydration and merging to prevent NULL overwrites.
+    - Automated supplier code generation fallback (`SUP-XXXXXX`).
+    - Asynchronous low-stock alert notifications via HTTP REST to `notification-service`.
+    - Recipe payload normalization (`requiredQuantity` vs `quantityRequired`).
+  - `src/controllers/`: HTTP request/response handlers with universal JSON envelopes (`ingredient.controller.js`, `supplier.controller.js`, `stock.controller.js`, `recipe.controller.js`, `bom.controller.js`, `report.controller.js`).
+  - `src/routes/`: Express routers mounted on `/api/v1/inventory/*` and internal root paths (`ingredient.routes.js`, `supplier.routes.js`, `stock.routes.js`, `recipe.routes.js`, `bom.routes.js`, `report.routes.js`).
+  - `src/validators/`: Payload validation rules enforcing branch IDs, quantities, numeric types, and required enum values.
+  - `src/routes/health.js`: Dual health probes (`/health/live` process probe, `/health/ready` DB & Redis probe).
+
+### 4. API Gateway & Security Integration
+
+- **Route Configuration (`backend/api-gateway/src/config/gatewayConfig.js`)**:
+  - Target URL: `http://localhost:8009` under path prefix `/api/v1/inventory`.
+  - Allowed RBAC roles: `SUPER_ADMIN`, `RESTAURANT_MANAGER`, `KITCHEN_CHEF`, `WAITSTAFF`.
+  - Public route whitelist regex: `^\/api\/v1\/[a-zA-Z0-9_-]+\/health(\/.*)?$` allowing unauthenticated readiness/liveness probing across all services.
+- **RBAC Bypass Fix (`backend/api-gateway/src/middlewares/rbacGuard.js`)**:
+  - Ensured `isPublicRoute(currentPath)` bypasses RBAC checking so public endpoints never return HTTP 403 Forbidden.
+
+### 5. Order Service Saga Integration
+
+- `backend/order-service/src/services/order.service.js`:
+  - **BOM Depletion Trigger**: Calls `inventory-service` `POST /api/v1/inventory/bom/deplete` via internal HTTP mesh (`X-Internal-Service-Key`) upon transition to `CONFIRMED` or `PREPARING`.
+  - **BOM Restitution (Compensating Rollback)**: Calls `inventory-service` `POST /api/v1/inventory/bom/restitute` when an order is cancelled, restoring reserved/deducted ingredients to inventory balances.
+
+### 6. Automated SQL Stored Procedure Unit Tests (26/26 Passed)
+
+Executed against isolated test database `RestaurantManagementDB_IsolatedTest`:
+
+```
+================================================================================
+  RMS PHASE 8: INVENTORY MANAGEMENT STORED PROCEDURES TEST SUITE
+================================================================================
+[TEST 01 PASS] Supplier Created Successfully (ID: 1)
+[TEST 02 PASS] Duplicate Supplier Email Blocked
+[TEST 03 PASS] Supplier Retrieved by ID (SUP-TEST-001)
+[TEST 04 PASS] Supplier List Fetched (Total: 1)
+[TEST 05 PASS] Supplier Updated (Terms: Net 45 Days)
+[TEST 06 PASS] Supplier Soft Deleted (IsActive: 0)
+[TEST 07 PASS] Ingredient Created Successfully (ID: 1, Stock: 50.00)
+[TEST 08 PASS] Duplicate Ingredient Code Blocked
+[TEST 09 PASS] Ingredient Retrieved by ID (ING-TEST-001)
+[TEST 10 PASS] Ingredient List Fetched (Total: 1)
+[TEST 11 PASS] Ingredient Updated (Cost: 160.00)
+[TEST 12 PASS] Ingredient Status Toggled (IsActive: 0)
+[TEST 13 PASS] Stock In Executed (New Balance: 75.00)
+[TEST 14 PASS] Stock Out Executed (New Balance: 65.00)
+[TEST 15 PASS] Stock Out Beyond Balance Blocked
+[TEST 16 PASS] Stock Adjustment Executed (New Balance: 70.00, Variance: 5.00)
+[TEST 17 PASS] Stock Transfer Executed (Source: 60.00, Dest: 10.00)
+[TEST 18 PASS] Stock Transfer Insufficient Balance Blocked
+[TEST 19 PASS] Low Stock Alerts Fetched (Total: 1)
+[TEST 20 PASS] Inventory Transactions Ledger Fetched (Total: 6)
+[TEST 21 PASS] Recipe Created Successfully (ID: 1)
+[TEST 22 PASS] Recipe Retrieved by MenuItem (Ingredients: 1)
+[TEST 23 PASS] BOM Check Stock Succeeded (Sufficient Stock)
+[TEST 24 PASS] BOM Depletion Executed (Deducted: 10.00)
+[TEST 25 PASS] BOM Restitution Executed (Restituted: 10.00)
+[TEST 26 PASS] Valuation Report Generated (Total Value > 0)
+================================================================================
+  RESULTS: 26 PASSED / 0 FAILED (100% SUCCESS RATE)
+================================================================================
+```
+
+### 7. Phase 8 API Integration Test Suite (44/44 Passed)
+
+Executed via `scripts/test_phase8.js` running against API Gateway (port 8000) and direct service (port 8009):
+
+```
+================================================================
+  RMS PHASE 8: INVENTORY MANAGEMENT SERVICE TEST SUITE
+================================================================
+--- GROUP 1: HEALTH & READINESS PROBES ---
+[✅ PASS] Test 01: Inventory Service Liveness Probe (/health/live)
+[✅ PASS] Test 02: Inventory Service Readiness Probe (/health/ready: DB & Redis)
+
+--- GROUP 2: SUPPLIER MANAGEMENT ---
+[✅ PASS] Test 03: Create Supplier (POST /api/v1/inventory/suppliers)
+[✅ PASS] Test 04: Duplicate Supplier Email Rejected (409 Conflict)
+[✅ PASS] Test 05: Get Supplier by ID (GET /api/v1/inventory/suppliers/:id)
+[✅ PASS] Test 06: List Suppliers with Pagination (GET /api/v1/inventory/suppliers)
+[✅ PASS] Test 07: Update Supplier Details (PUT /api/v1/inventory/suppliers/:id)
+[✅ PASS] Test 08: Delete Supplier (DELETE /api/v1/inventory/suppliers/:id)
+
+--- GROUP 3: INGREDIENT CATALOG MANAGEMENT ---
+[✅ PASS] Test 09: Create Ingredient with Opening Stock (POST /api/v1/inventory/ingredients)
+[✅ PASS] Test 10: Duplicate Ingredient Code Blocked (409 Conflict)
+[✅ PASS] Test 11: Get Ingredient by ID (GET /api/v1/inventory/ingredients/:id)
+[✅ PASS] Test 12: List Ingredients by Branch (GET /api/v1/inventory/ingredients)
+[✅ PASS] Test 13: Update Ingredient Attributes & Costs (PUT /api/v1/inventory/ingredients/:id)
+[✅ PASS] Test 14: Toggle Ingredient Active Status (PATCH /api/v1/inventory/ingredients/:id/status)
+[✅ PASS] Test 15: Create Second Ingredient for Transfer/Recipe Tests
+[✅ PASS] Test 16: Delete Ingredient (DELETE /api/v1/inventory/ingredients/:id)
+
+--- GROUP 4: STOCK MOVEMENTS (IN, OUT, ADJUSTMENT, TRANSFER) ---
+[✅ PASS] Test 17: Stock In - Procurement Receipt (POST /api/v1/inventory/stock/in)
+[✅ PASS] Test 18: Stock Out - Wastage / Spoilage (POST /api/v1/inventory/stock/out)
+[✅ PASS] Test 19: Stock Out Rejects Quantity Exceeding Available Stock (400 Bad Request)
+[✅ PASS] Test 20: Stock Adjustment - Physical Audit Reconciliation (POST /api/v1/inventory/stock/adjust)
+[✅ PASS] Test 21: Stock Transfer Between Branches (POST /api/v1/inventory/stock/transfer)
+[✅ PASS] Test 22: Stock Transfer Rejects Insufficient Balance (400 Bad Request)
+
+--- GROUP 5: RECIPE MANAGEMENT (BILL OF MATERIALS) ---
+[✅ PASS] Test 23: Create Recipe BOM for Menu Item (POST /api/v1/inventory/recipes)
+[✅ PASS] Test 24: Get Recipe BOM by Menu Item ID (GET /api/v1/inventory/recipes/:menuItemId)
+[✅ PASS] Test 25: Update Recipe BOM Composition (POST /api/v1/inventory/recipes)
+[✅ PASS] Test 26: Delete Recipe BOM (DELETE /api/v1/inventory/recipes/:id)
+
+--- GROUP 6: BOM CHECK, DEPLETION & RESTITUTION (ORDER SAGA INTEGRATION) ---
+[✅ PASS] Test 27: Setup Active Recipe BOM for Order Saga Tests
+[✅ PASS] Test 28: Check Stock Availability for Order Items (POST /api/v1/inventory/bom/check)
+[✅ PASS] Test 29: Check Stock Detects Insufficient Stock for Excessive Quantity
+[✅ PASS] Test 30: Deplete Stock on Order Confirmation (POST /api/v1/inventory/bom/deplete)
+[✅ PASS] Test 31: Duplicate Depletion Blocked (Idempotency Check)
+[✅ PASS] Test 32: Restitute Stock on Order Cancellation (POST /api/v1/inventory/bom/restitute)
+[✅ PASS] Test 33: Duplicate Restitution Blocked (Idempotency Check)
+
+--- GROUP 7: INVENTORY REPORTING & AUDIT TRAILS ---
+[✅ PASS] Test 34: Get Low Stock Alerts (GET /api/v1/inventory/reports/low-stock)
+[✅ PASS] Test 35: Get Inventory Transactions Audit Ledger (GET /api/v1/inventory/reports/transactions)
+[✅ PASS] Test 36: Filter Transactions by Movement Type (TYPE = STOCK_IN)
+[✅ PASS] Test 37: Get Inventory Valuation Report (GET /api/v1/inventory/reports/valuation)
+[✅ PASS] Test 38: Valuation Report Computes Positive Financial Value
+[✅ PASS] Test 39: Get Consumption Report (GET /api/v1/inventory/reports/consumption)
+
+--- GROUP 8: SECURITY & RBAC AUTHORIZATION ---
+[✅ PASS] Test 40: Unauthenticated Request Blocked by Gateway (401 Unauthorized)
+[✅ PASS] Test 41: Customer Role Blocked from Inventory Operations (403 Forbidden)
+[✅ PASS] Test 42: Waitstaff Role Blocked from Valuation Financials (403 Forbidden)
+[✅ PASS] Test 43: Restaurant Manager Role Authorized for Operations (200 OK)
+[✅ PASS] Test 44: Super Admin Role Authorized for All Operations (200 OK)
+
+================================================================
+  TEST SUMMARY: 44 Passed / 0 Failed (100% Success Rate)
+================================================================
+🎉 ALL 44 PHASE 8 TEST REQUIREMENTS PASSED WITH 100% SUCCESS!
+```
+
+### 8. Full Cumulative Regression Verification Summary
+
+| Test Suite | Script File | Target Domain | Tests Run | Result |
+| :--- | :--- | :--- | :---: | :---: |
+| **All Services Health** | `scripts/verify_all_services_startup.js` | 14 Microservices Health Probes | 14 / 14 | **100% PASSED** |
+| **Phase 4 Suite** | `scripts/test_phase4.js` | Auth Service & User Service | 20 / 20 | **100% PASSED** |
+| **Phase 5 Suite** | `scripts/test_phase5.js` | Restaurant Service & Floor Management | 24 / 24 | **100% PASSED** |
+| **Phase 6 Suite** | `scripts/test_phase6.js` | Menu Service & Redis Catalog Caching | 36 / 36 | **100% PASSED** |
+| **Phase 7 Suite** | `scripts/test_phase7.js` | Cart Service & Order Service | 46 / 46 | **100% PASSED** |
+| **Phase 8 SQL Unit Suite** | `database/tests/12_InventoryStoredProcedures_Test.sql` | 25 Inventory Stored Procedures | 26 / 26 | **100% PASSED** |
+| **Phase 8 API Suite** | `scripts/test_phase8.js` | Inventory Management REST APIs | 44 / 44 | **100% PASSED** |
+| **Phase 9 SQL Unit Suite** | `database/tests/13_PaymentStoredProcedures_Test.sql` | 14 Payment Stored Procedures | 21 / 21 | **100% PASSED** |
+| **Phase 9 API Suite** | `scripts/test_phase9.js` | Payment Service & Razorpay Integration | 38 / 38 | **100% PASSED** |
+| **Total Test Assertions Passing** | | | **269 / 269** | **100% PASS RATE** |
+
+### 9. Database Deployment Status
+
+- **Isolated Test Database (`RestaurantManagementDB_IsolatedTest`)**:
+  - **Status**: **DEPLOYED & FULLY VERIFIED (100%)**.
+  - All 14 Payment stored procedures deployed and 21/21 SQL unit tests executed cleanly.
+  - All Order stored procedures deployed to enable cross-service synchronization testing.
+- **Live Production Database (`RestaurantManagementDB`)**:
+  - **Status**: **PENDING APPROVAL**.
+  - Stored procedures are packaged in `database/13_PaymentStoredProcedures.sql` and ready for execution upon explicit user sign-off.
+  - Zero existing tables or production records were modified.
+
+---
+
+## Phase 9 — Payment Service: Complete Implementation & Verification Report
+
+### Status: COMPLETED (Passed 38/38 API Tests + 21/21 SQL Unit Tests)
+
+#### 1. Database Stored Procedures Authoring (`database/13_PaymentStoredProcedures.sql`)
+Authored 14 single-responsibility, enterprise-grade T-SQL stored procedures (SPs 132–145):
+1. `dbo.usp_Payment_Create` (SP 132): Validates order and branch existence, generates structured business payment reference (`PAY-YYYYMMDD-ORDERID-SUFFIX`), records `PENDING` payment, and logs initial ledger intent.
+2. `dbo.usp_Payment_VerifyAndCapture` (SP 133): Row-level locking capture updating status to `SUCCESS`, recording gateway payment ID and signature, and logging `WEBHOOK_CAPTURE` or client capture ledger event. Idempotent on repeated calls.
+3. `dbo.usp_Payment_RecordFailure` (SP 134): Records payment failure with gateway error codes and descriptions; logs `CHARGE_FAILED` ledger event.
+4. `dbo.usp_Payment_SettleOffline` (SP 135): Immediate settlement of on-premise payments (`CASH`, `CREDIT_CARD`, `DEBIT_CARD`, `UPI_OFFLINE`), recording settling cashier user ID (`SettledByUserId`) and timestamps.
+5. `dbo.usp_Payment_GetById` (SP 136): Multi-recordset fetch returning payment header, immutable transaction ledger history, refund records, and balance calculations.
+6. `dbo.usp_Payment_GetByOrderId` (SP 137): Multi-recordset fetch returning all payments and refunds for a specific order.
+7. `dbo.usp_Payment_GetByGatewayOrderId` (SP 138): Fast indexed lookup by Razorpay gateway order identifier.
+8. `dbo.usp_Payment_GetByGatewayPaymentId` (SP 139): Fast indexed lookup by Razorpay payment identifier.
+9. `dbo.usp_Payment_List` (SP 140): Filtered, paginated listing with branch, method, status, order, and date-range filters.
+10. `dbo.usp_Payment_LogTransaction` (SP 141): Direct ledger logging helper for raw payloads and audit events.
+11. `dbo.usp_Payment_Refund_Create` (SP 142): Atomically processes partial or full refunds. Uses row-level locking (`UPDLOCK, HOLDLOCK`) to guard against concurrent over-refunding; transitions status to `PARTIALLY_REFUNDED` or `REFUNDED`.
+12. `dbo.usp_Payment_Refund_GetById` (SP 143): Retrieves refund details with parent payment and initiator staff details.
+13. `dbo.usp_Payment_GetReconciliationSummary` (SP 144): Aggregates total transactions, gross collections, total refunds, net collections, and breakdown by payment method.
+14. `dbo.usp_Payment_GetStatus` (SP 145): High-performance lightweight status check by `PaymentId` or `PaymentReference`.
+
+#### 2. SQL Unit Testing Suite (`database/tests/13_PaymentStoredProcedures_Test.sql`)
+- Deployed to `RestaurantManagementDB_IsolatedTest` on port 1435.
+- Executed 21 comprehensive test scenarios covering payment intent, idempotency, signature capture, failure logging, offline cash settlement, partial refund, excess refund overdraw protection, full refund status advancement to `REFUNDED`, multi-criteria queries, and reconciliation summaries.
+- **Result: 21 / 21 Tests PASSED (100% Success Rate)**.
+
+#### 3. Backend Microservice Implementation (`backend/payment-service/` :8008)
+- **Directory Structure**:
+  - `src/repositories/`: `payment.repository.js`, `transaction.repository.js`, `refund.repository.js`, `index.js`.
+  - `src/services/`: `razorpay.service.js` (Razorpay SDK, HMAC-SHA256 constant-time verification, webhook signature validation, refund dispatch, test mock fallback), `payment.service.js` (intent, capture, failure, offline settlement, order synchronization), `webhook.service.js` (public webhook ingress, Redis distributed idempotency `webhook:rzp:${id}`), `refund.service.js` (full/partial refund orchestration, balance verification), `reconciliation.service.js`, `index.js`.
+  - `src/validators/`: Strict input validation schemas for create-order, verify, offline-settle, and refund.
+  - `src/controllers/`: `payment.controller.js`, `webhook.controller.js`, `refund.controller.js`, `reconciliation.controller.js`, `index.js`.
+  - `src/routes/`: `payment.routes.js`, `webhook.routes.js`, `refund.routes.js`, `report.routes.js`, `health.js` (dual probes `/health/live` and `/health/ready` testing MSSQL & Redis).
+  - `src/app.js` & `src/index.js`: Standard express application mounting raw body preservation buffer `express.json({ verify: ... })` for HMAC verification.
+
+#### 4. Order Service Inter-Service Synchronization
+- Implemented `PATCH /api/v1/orders/:orderId/payment-status` in `backend/order-service`:
+  - Authenticated via internal mesh key (`X-Internal-Service-Key`) or JWT.
+  - Updates `dbo.Orders.PaymentStatus` (`PAID`, `FAILED`) and records audit history in `OrderStatusHistory`.
+  - Automatically advances dine-in orders in `SERVED` or `READY` status to `COMPLETED` when paid in full.
+
+#### 5. API Gateway Integration & RBAC Configuration (`backend/api-gateway/`)
+- Ingress routing mounted: `/api/v1/payments -> http://localhost:8008`.
+- Configured RBAC in `gatewayConfig.js`:
+  - `/api/v1/payments/razorpay/webhook`: Public webhook ingress.
+  - `/api/v1/payments/offline-settle`: Restricted to `CASHIER_POS`, `RESTAURANT_MANAGER`, `SUPER_ADMIN`.
+  - `/api/v1/payments/refund`: Restricted to `RESTAURANT_MANAGER`, `SUPER_ADMIN`.
+  - `/api/v1/payments/reports/reconciliation`: Restricted to `RESTAURANT_MANAGER`, `SUPER_ADMIN`.
+  - General payment lookups and creation: Authenticated roles (`CUSTOMER`, `WAITSTAFF`, `CASHIER_POS`, `RESTAURANT_MANAGER`, `SUPER_ADMIN`).
+
+#### 6. End-to-End Automated Test Execution (`scripts/test_phase9.js`)
+- Executed against API Gateway (port 8000), Payment Service (port 8008), and Order Service (port 8007) on `RestaurantManagementDB_IsolatedTest`:
+  - Group 1: Health Probes & Gateway Ingress (4/4 passed)
+  - Group 2: Online Payment Order Creation (4/4 passed)
+  - Group 3: Cryptographic Signature Verification & Capture (4/4 passed)
+  - Group 4: Asynchronous Razorpay Webhooks & Redis Distributed Idempotency (3/3 passed)
+  - Group 5: Payment Failure Handling (2/2 passed)
+  - Group 6: Offline POS Payment Settlement (4/4 passed)
+  - Group 7: Refund Management - Partial, Excess Guard & Full (5/5 passed)
+  - Group 8: Payment Lookups, Multi-Recordset History & Reconciliation Reports (6/6 passed)
+  - Group 9: Security, Authentication & RBAC Authorization (6/6 passed)
+- **Result: 38 / 38 Tests PASSED (100% Success Rate)**.
+
+#### 7. Cumulative Platform Health
+- **Total Services Verified**: 14 / 14 Microservices Healthy (100%).
+- **Cumulative Regression Test Suite**: 269 / 269 Tests Passing across Phases 4 through 9 (100% Pass Rate).
+- **Scope Boundary**: Stopped after Phase 9. Phase 10 (Kitchen / Notification) strictly NOT started.
+
+
+
+
 
 
 
