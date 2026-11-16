@@ -9,6 +9,7 @@
 const { errorResponse } = require('../utils/response');
 
 function requireRoles(...allowedRoles) {
+  const targetRoles = allowedRoles.flat();
   return (req, res, next) => {
     if (req.isInternalService) return next();
 
@@ -17,10 +18,10 @@ function requireRoles(...allowedRoles) {
     }
 
     const userRoles = Array.isArray(req.user.roles) ? req.user.roles : [req.user.role || req.user.roles];
-    const hasRole = userRoles.some(r => allowedRoles.includes(r) || r === 'SUPER_ADMIN');
+    const hasRole = userRoles.some(r => targetRoles.includes(r) || r === 'SUPER_ADMIN');
 
     if (!hasRole) {
-      return errorResponse(res, 403, 'FORBIDDEN', `Access denied: requires one of the following roles: [${allowedRoles.join(', ')}]`);
+      return errorResponse(res, 403, 'FORBIDDEN', `Access denied: requires one of the following roles: [${targetRoles.join(', ')}]`);
     }
 
     next();

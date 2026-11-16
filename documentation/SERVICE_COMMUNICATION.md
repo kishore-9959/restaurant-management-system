@@ -409,6 +409,30 @@ sequenceDiagram
 - **WebSocket Gateway**: Manages authenticated client connections, JWT validation, and room-level authorization (`branch:{id}:kitchen`, `branch:{id}:waitstaff`, `user:{id}`).
 - **Internal Ledger Ownership**: Exclusive owner of `dbo.Notifications`.
 
+---
+
+#### 6.7 Dynamic Website CMS Service Contracts (`cms-service` :8004)
+- **Role**: Headless content management system, dynamic layout authoring, branding & theme tokens, SEO management, media CDN signing, and guest inquiries.
+- **Inbound Public Endpoints (Whitelisted on API Gateway)**:
+  - `GET /api/v1/cms/public/settings`: Branding tokens, active hours, contact details, dynamic color themes.
+  - `GET /api/v1/cms/public/seo`: Global meta tags, OpenGraph images, and tracking identifiers.
+  - `GET /api/v1/cms/public/banners`: Active promotional banners and hero slides.
+  - `GET /api/v1/cms/public/navigation`: Hierarchical navigation tree.
+  - `GET /api/v1/cms/public/footer`: Footer multi-column structure and social channels.
+  - `GET /api/v1/cms/public/faqs`: Help center and dining FAQs.
+  - `GET /api/v1/cms/public/testimonials`: Curated guest and critic reviews.
+  - `GET /api/v1/cms/public/social-links`: Social media channels.
+  - `GET /api/v1/cms/public/pages/:slug`: Dynamic page layout with ordered section component definitions.
+  - `POST /api/v1/cms/public/contact`: Guest inquiry submission.
+- **Inbound Administrative Endpoints (RBAC: `SUPER_ADMIN`, `RESTAURANT_MANAGER`)**:
+  - Full CRUD operations for settings, SEO, pages, sections, banners, navigation, footers, FAQs, reviews, and social links.
+  - `GET /api/v1/cms/admin/media/sign`: Cryptographic Cloudinary signature generation for direct CDN asset upload.
+  - `POST /api/v1/cms/admin/contact/:id/reply`: Staff inquiry resolution.
+- **Downstream Dependency (`notification-service` :8012)**:
+  - Invokes `POST /api/v1/notifications/internal/broadcast` with `X-Internal-Service-Key` upon new guest contact submission to alert managers without violating database ownership boundaries.
+- **Internal Ledger Ownership**: Exclusive owner of `dbo.WebsitePages`, `dbo.WebsitePageSections`, `dbo.WebsiteSettings`, `dbo.SEOSettings`, `dbo.PromotionalBanners`, `dbo.NavigationMenus`, `dbo.FooterSections`, `dbo.FAQs`, `dbo.CustomerTestimonials`, `dbo.SocialMediaLinks`, and `dbo.ContactMessages`.
+
+
 
 
 
