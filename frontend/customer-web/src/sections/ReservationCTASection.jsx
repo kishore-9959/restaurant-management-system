@@ -45,7 +45,7 @@ export default function ReservationCTASection({ section }) {
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <Link
-            to="/contact"
+            to="/reservations"
             className="px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-full shadow-xl transition-all transform hover:scale-105 flex items-center gap-2"
           >
             <CalendarCheck className="w-5 h-5" />

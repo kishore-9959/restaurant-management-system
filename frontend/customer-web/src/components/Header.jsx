@@ -22,9 +22,10 @@ export default function Header() {
         { MenuId: 2, Title: 'About Us', TargetUrl: '/about' },
         { MenuId: 3, Title: 'Menu', TargetUrl: '/menu' },
         { MenuId: 4, Title: 'Locations', TargetUrl: '/locations' },
-        { MenuId: 5, Title: 'FAQs', TargetUrl: '/faqs' },
-        { MenuId: 6, Title: 'Reviews', TargetUrl: '/testimonials' },
-        { MenuId: 7, Title: 'Contact', TargetUrl: '/contact' },
+        { MenuId: 5, Title: 'Reservations', TargetUrl: '/reservations' },
+        { MenuId: 6, Title: 'FAQs', TargetUrl: '/faqs' },
+        { MenuId: 7, Title: 'Reviews', TargetUrl: '/testimonials' },
+        { MenuId: 8, Title: 'Contact', TargetUrl: '/contact' },
       ];
 
   return (
@@ -94,7 +95,7 @@ export default function Header() {
             <Phone size={16} color="var(--primary-color)" />
             <span>{contactPhone}</span>
           </a>
-          <Link to="/contact" className="btn-primary" style={{ padding: '0.6rem 1.4rem', fontSize: '0.9rem' }}>
+          <Link to="/reservations" className="btn-primary" style={{ padding: '0.6rem 1.4rem', fontSize: '0.9rem' }}>
             Reserve Table
           </Link>
 

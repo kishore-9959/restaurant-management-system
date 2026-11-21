@@ -104,6 +104,7 @@ const publicRoutePatterns = [
   /^\/api\/v1\/menu\/public(\/.*)?$/,
   /^\/api\/v1\/tables\/qr\/[a-zA-Z0-9_-]+$/,
   /^\/api\/v1\/cart(\/.*)?$/,
+  /^\/api\/v1\/reservations\/public(\/.*)?$/,
   /^\/api\/v1\/payments\/razorpay\/webhook$/,
   /^\/health(\/.*)?$/,
   /^\/api\/v1\/[a-zA-Z0-9_-]+\/health(\/.*)?$/,
@@ -146,6 +147,14 @@ const rbacRules = [
   {
     pattern: /^\/api\/v1\/payments(\/.*)?$/,
     allowedRoles: ['CUSTOMER', 'WAITSTAFF', 'CASHIER_POS', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+  },
+  {
+    pattern: /^\/api\/v1\/reservations\/my-bookings(\/.*)?$/,
+    allowedRoles: ['CUSTOMER', 'RESTAURANT_MANAGER', 'SUPER_ADMIN'],
+  },
+  {
+    pattern: /^\/api\/v1\/reservations(\/.*)?$/,
+    allowedRoles: ['SUPER_ADMIN', 'RESTAURANT_MANAGER', 'WAITSTAFF', 'HOSTESS', 'CASHIER_POS'],
   },
   {
     pattern: /^\/api\/v1\/reports(\/.*)?$/,

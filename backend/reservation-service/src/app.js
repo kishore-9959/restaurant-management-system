@@ -2,6 +2,7 @@
  * ============================================================================
  * RESTAURANT MANAGEMENT SYSTEM (RMS) - RESERVATION SERVICE APPLICATION
  * File: backend/reservation-service/src/app.js
+ * Description: Express application definition for Reservation Service.
  * ============================================================================
  */
 
@@ -18,6 +19,9 @@ const {
 } = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
+const publicRoutes = require('./routes/public.routes');
+const customerRoutes = require('./routes/customer.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const logger = createServiceLogger('reservation-service');
 const app = express();
@@ -29,7 +33,20 @@ app.use(createRequestLogger(logger));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health checks
 app.use(healthRoutes);
+
+// Public reservation routes (unauthenticated)
+app.use('/api/v1/reservations/public', publicRoutes);
+app.use('/public', publicRoutes);
+
+// Customer personal bookings (authenticated customer)
+app.use('/api/v1/reservations/my-bookings', customerRoutes);
+app.use('/my-bookings', customerRoutes);
+
+// Admin / staff reservation routes (authenticated staff/manager)
+app.use('/api/v1/reservations', adminRoutes);
+app.use('/', adminRoutes);
 
 app.use((req, res) => {
   return errorResponse(res, {
@@ -42,4 +59,3 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 module.exports = { app, logger };
-

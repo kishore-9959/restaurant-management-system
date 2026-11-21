@@ -6,9 +6,9 @@
 ### Project Status Overview
 
 - **Architecture Model**: **Microservices Architecture Only (14 Microservices, API Gateway, Redis, Socket.IO, Shared MSSQL Database, 100% Stored Procedures, Zero ORM)**
-- **Current Milestone**: Phase 11 Dynamic Website CMS Service & Public Customer Frontend COMPLETED
-- **Status**: **Phase 11 100% Complete & Verified (47/47 SPs Deployed & Tested, 48/48 API Tests Passed, 98/98 Frontend Tests Passed, 22/22 Integration Tests Passed, Phase 10 Regression Zero Regressions)**
-- **Next Milestone**: Phase 12: Reservation Service & Floor Scheduling
+- **Current Milestone**: Phase 13 Report Service & Analytics Dashboard COMPLETED
+- **Status**: **Phase 13 100% Complete & Verified on Isolated DB (25/25 SPs Deployed & Tested on Isolated DB, 76/76 API Tests Passed, 15/15 Security Tests Passed, 19/19 Frontend Tests Passed, 12/12 Integration Tests Passed, Phase 10, 11 & 12 Regressions 100% Passed. Primary RestaurantManagementDB Preserved Untouched Pending Approval)**
+- **Next Milestone**: Phase 14: Client Applications Integration (Customer, Admin, Kitchen, POS)
 - **Lead Architect**: Senior Microservices Architect & SQL Server Database Architect
 
 ---
@@ -29,9 +29,8 @@
 | **Phase 9** | Payment Service (Razorpay Gateway, Webhooks, Offline Settlement, Refunds) | **COMPLETED** | **2026-11-15** | **Passed 38/38 Tests + 21/21 SQL Tests** |
 | **Phase 10**| Kitchen Service & Notification Service (Real-time Socket.IO KDS) | **COMPLETED** | **2026-11-15** | **Passed 103/103 Tests + 21/21 SQL Tests** |
 | **Phase 11**| Dynamic Website CMS Service & Public Customer Frontend | **COMPLETED** | **2026-11-16** | **Passed 215/215 Tests + 47/47 SQL Tests** |
-| **Phase 12**| Reservation Service & Floor Scheduling | *Planned* | - | Pending |
-| **Phase 12**| Reservation Service & Floor Scheduling | *Planned* | - | Pending |
-| **Phase 13**| Report Service & Analytics Aggregator | *Planned* | - | Pending |
+| **Phase 12**| Reservation Service & Floor Scheduling | **COMPLETED** | **2026-11-16** | **Passed 85/85 Tests + 16/16 SQL Tests** |
+| **Phase 13**| Report Service & Analytics Aggregator | **COMPLETED** | **2026-11-18** | **Passed 147/147 Tests (Isolated DB Verified)** |
 | **Phase 14**| Client Applications Integration (Customer, Admin, Kitchen, POS) | *Planned* | - | Pending |
 | **Phase 15**| End-to-End Testing, Hardening, Nginx & Production Launch | *Planned* | - | Pending |
 
@@ -1080,3 +1079,126 @@ Authored 14 single-responsibility, enterprise-grade T-SQL stored procedures (SPs
 
 
 
+
+---
+
+## Phase 12 — Reservation Service & Floor Scheduling: Complete Implementation
+
+### Status: COMPLETED & 100% TESTED (All 4 Suites Passed, Zero Regressions)
+
+#### 1. Database Layer: 16 Parameterized Stored Procedures (`database/16_ReservationStoredProcedures.sql`)
+- Deployed all 16 single-responsibility, ACID-compliant stored procedures (SPs 210 through 225):
+  - **SP 210**: `dbo.usp_Reservation_Create` (Booking creation with capacity, branch operating hours, and overlap checks)
+  - **SP 211**: `dbo.usp_Reservation_GetById` (Single reservation lookup with branch, table, section, and user joins)
+  - **SP 212**: `dbo.usp_Reservation_List` (Paginated list with date, status, table, and text search)
+  - **SP 213**: `dbo.usp_Reservation_Update` (Details update with conflict re-check on existing assigned table)
+  - **SP 214**: `dbo.usp_Reservation_Cancel` (Status cancellation, table release, and reason logging in `dbo.AuditLogs`)
+  - **SP 215**: `dbo.usp_Reservation_UpdateStatus` (Strict state machine: `CONFIRMED -> SEATED -> COMPLETED`, unassigned seating block)
+  - **SP 216**: `dbo.usp_Reservation_AssignTable` (Atomic table assignment with `WITH (UPDLOCK, HOLDLOCK)` overlap guard)
+  - **SP 217**: `dbo.usp_Reservation_ReleaseTable` (Unassigns physical table from booking)
+  - **SP 218**: `dbo.usp_Reservation_CheckAvailability` (Discovers candidate tables for party size, date, and start time)
+  - **SP 219**: `dbo.usp_Reservation_GetTimeSlots` (Computes 30-min booking intervals with real-time available table counts)
+  - **SP 220**: `dbo.usp_Reservation_ListByCustomer` (Registered customer's chronological booking history)
+  - **SP 221**: `dbo.usp_Reservation_GetDashboardSummary` (Daily operational KPIs: covers, confirmed, seated, no-shows)
+  - **SP 222**: `dbo.usp_Reservation_CreateWalkIn` (Instant walk-in seating with current timestamp and table assignment)
+  - **SP 223**: `dbo.usp_Reservation_GetFloorTimeline` (Active tables with reservations for visual floor Gantt schedule)
+  - **SP 224**: `dbo.usp_Reservation_GetStatusHistory` (Retrieves complete audit trail from `dbo.AuditLogs`)
+  - **SP 225**: `dbo.usp_Reservation_AutoMarkNoShows` (Automated sweep for overdue bookings past grace period)
+- Pre-validated and tested on `RestaurantManagementDB_IsolatedTest` (19/19 tests passed) prior to primary deployment.
+- Deployed and verified active on primary `RestaurantManagementDB`.
+
+#### 2. Backend Architecture (`backend/reservation-service/`)
+- Multi-tier architecture: Repositories $\rightarrow$ Services $\rightarrow$ Controllers $\rightarrow$ Routes $\rightarrow$ Validators.
+- Service port 8011, Gateway ingress route `/api/v1/reservations`.
+- Zero Sequelize ORM models or associations; 100% parameterized stored procedures via `@rms/shared`.
+- Inter-service REST clients:
+  - `restaurantClient`: Synchronizes table status (`currentStatus = 'OCCUPIED' | 'AVAILABLE'`) with `restaurant-service` (:8003).
+  - `notificationClient`: Broadcasts real-time hostess alerts with `notification-service` (:8012).
+
+#### 3. API Gateway Ingress & RBAC (`backend/api-gateway/`)
+- Whitelisted public routes `/api/v1/reservations/public/*` for unauthenticated booking and availability discovery.
+- Customer RBAC rule `/api/v1/reservations/my-bookings/*` for `CUSTOMER`, `RESTAURANT_MANAGER`, `SUPER_ADMIN`.
+- Staff RBAC rule `/api/v1/reservations/*` for `SUPER_ADMIN`, `RESTAURANT_MANAGER`, `WAITSTAFF`, `HOSTESS`, `CASHIER_POS`.
+
+#### 4. Customer Web Frontend Integration (`frontend/customer-web/`)
+- API Client `src/services/reservationService.js` calling `/api/v1/reservations/*`.
+- Interactive 4-step booking wizard `src/pages/ReservationPage.jsx`:
+  - Step 1: Branch, Date, and Party Size (1 to 12+ guests).
+  - Step 2: Time slot grid with real-time available table count badges.
+  - Step 3: Guest details form with phone, email, and special requests.
+  - Step 4: Booking confirmation card with reference ID, summary details, and calendar export.
+  - Tab 2: "Find / Cancel Booking" self-service portal with phone verification and one-click cancellation.
+- Mounted `/reservations` route in `src/routes/AppRoutes.jsx`.
+- Linked `ReservationCTASection.jsx` and `Header.jsx` "Reserve Table" CTA button to `/reservations`.
+
+#### 5. Verification & Test Suite Execution
+- Database unit test suite (`scripts/test_phase12_database.js`): **19 / 19 Tests PASSED**.
+- Backend REST API suite (`scripts/test_phase12_api.js`): **29 / 29 Tests PASSED**.
+- Customer Web frontend verification (`scripts/test_phase12_frontend.js`): **21 / 21 Assertions PASSED**.
+- End-to-End integration suite (`scripts/test_phase12_integration.js`): **16 / 16 Tests PASSED**.
+- Master Phase 12 test runner (`scripts/test_phase12.js`): **4 / 4 Suites PASSED (100% Success Rate)**.
+- Regression suites (`scripts/test_phase10.js` & `scripts/test_phase11.js`): **8 / 8 Suites PASSED (100% Success Rate, Zero Regressions)**.
+
+#### 6. Master Documentation Delivered
+- `documentation/PHASE12_IMPLEMENTATION_REPORT.md`
+- `documentation/PHASE12_TEST_REPORT.md`
+- `documentation/PHASE12_DEPLOYMENT_GUIDE.md`
+- `documentation/RESERVATION_SERVICE_API.md`
+- `documentation/RESERVATION_DATABASE_DESIGN.md`
+- `documentation/SERVICE_COMMUNICATION.md` (Updated with Section 6.8 Reservation Service contracts)
+- `DEVELOPMENT_PROGRESS.md` (Updated)
+
+
+---
+
+## Phase 13 — Report Service & Analytics Dashboard: Complete Implementation
+
+### Status: COMPLETED & 100% TESTED (Isolated DB Verified, Primary DB Untouched)
+
+#### 1. Database Layer: 25 Parameterized Stored Procedures (`database/17_ReportStoredProcedures.sql`)
+- Authored all 25 single-responsibility, ACID-compliant stored procedures (SPs 226 through 250):
+  - **Financial & Executive Analytics (SPs 226–231)**: `dbo.usp_Report_ExecutiveDashboardSummary`, `dbo.usp_Report_SalesDaily`, `dbo.usp_Report_SalesMonthly`, `dbo.usp_Report_SalesTrends`, `dbo.usp_Report_SalesByBranch`, `dbo.usp_Report_SalesByRestaurant`.
+  - **Menu & Product Performance (SPs 232–233, 239)**: `dbo.usp_Report_SalesByItem`, `dbo.usp_Report_SalesByCategory`, `dbo.usp_Report_TopSellingItems`.
+  - **Payments & Financial Reconciliation (SPs 234–236)**: `dbo.usp_Report_RevenueSummary`, `dbo.usp_Report_RevenueByPaymentMethod`, `dbo.usp_Report_RevenueRefunds`.
+  - **Operational & Dining Velocity (SPs 237–238)**: `dbo.usp_Report_OrdersSummary`, `dbo.usp_Report_OrdersPeakHours`.
+  - **Inventory & Supply Chain (SPs 240–244)**: `dbo.usp_Report_InventoryCurrentStock`, `dbo.usp_Report_InventoryLowStock`, `dbo.usp_Report_InventoryTransactions`, `dbo.usp_Report_InventoryValuation`, `dbo.usp_Report_InventoryConsumption`.
+  - **Guest & Reservation Metrics (SPs 245–248)**: `dbo.usp_Report_ReservationSummary`, `dbo.usp_Report_ReservationTrends`, `dbo.usp_Report_CustomerAnalytics`, `dbo.usp_Report_CustomerTopSpenders`.
+  - **Multi-Branch Scorecards (SPs 249–250)**: `dbo.usp_Report_BranchPerformance`, `dbo.usp_Report_RestaurantPerformance`.
+- All procedures use `READ COMMITTED` isolation and Common Table Expression (CTE) pre-aggregation, guaranteeing mathematical accuracy and zero Cartesian product duplication.
+- Customer PII masked (`****`) with zero password hash leakage.
+- Deployed and tested **EXCLUSIVELY** against `RestaurantManagementDB_IsolatedTest` (25/25 unit tests passed).
+- **Primary database `RestaurantManagementDB` preserved completely untouched (0 report procedures).**
+
+#### 2. Backend Architecture (`backend/report-service/`)
+- Multi-tier architecture: Repositories -> Services -> Controllers -> Routes -> Validators.
+- Service port 8013, Gateway ingress route `/api/v1/reports`.
+- Zero Sequelize ORM models or associations; 100% parameterized stored procedures via `@rms/shared`.
+- Multi-branch tenancy: Managers locked to assigned branch (`user.branchId`); Super Admins have global multi-branch visibility.
+- Redis distributed caching with dynamic TTLs (15–60s real-time, 24h historical) and `?refresh=true` bypass.
+- Streaming file export engine supporting Excel (`exceljs`), PDF (`pdfkit`), and CSV formats.
+
+#### 3. API Gateway Ingress & RBAC (`backend/api-gateway/`)
+- Ingress proxy route `/api/v1/reports` mounted to `http://localhost:8013`.
+- Strict RBAC rule: Only `SUPER_ADMIN` and `RESTAURANT_MANAGER` authorized. Unauthenticated requests rejected with 401; customers and staff rejected with 403.
+
+#### 4. Frontend Admin Analytics Dashboard (`frontend/customer-web/`)
+- Client API service `src/services/reportService.js` with full error handling and binary stream download triggers.
+- Executive analytics dashboard `src/pages/AdminAnalyticsDashboard.jsx` with KPI cards, pure SVG trend charts, top-selling items leaderboard, branch comparison matrix, and one-click streaming exports.
+- Mounted at `/admin/analytics` and `/admin/reports` outside `MainLayout`, ensuring zero administrative links leak into public customer navigation.
+
+#### 5. Verification & Test Suite Execution
+- Database unit test suite (`scripts/test_phase13_database.js`): **25 / 25 Procedures PASSED**.
+- Backend REST API & Exports suite (`scripts/test_phase13_api.js`): **76 / 76 Assertions PASSED**.
+- Security & Tenancy Isolation suite (`scripts/test_phase13_security.js`): **15 / 15 Assertions PASSED**.
+- Frontend architecture suite (`scripts/test_phase13_frontend.js`): **19 / 19 Assertions PASSED**.
+- Gateway & Redis integration suite (`scripts/test_phase13_integration.js`): **12 / 12 Assertions PASSED**.
+- Master Phase 13 test runner (`scripts/test_phase13.js`): **5 / 5 Suites PASSED (100% Success Rate)**.
+- Regression test suites (`scripts/test_phase10.js`, `test_phase11.js`, `test_phase12.js`): **12 / 12 Suites PASSED (100% Success Rate, Zero Regressions)**.
+
+#### 6. Master Documentation Delivered
+- `documentation/PHASE13_IMPLEMENTATION_REPORT.md`
+- `documentation/PHASE13_TEST_REPORT.md`
+- `documentation/PHASE13_DEPLOYMENT_GUIDE.md`
+- `documentation/REPORT_SERVICE_API.md`
+- `documentation/SERVICE_COMMUNICATION.md` (Updated with Section 6.9 Report Service contracts)
+- `DEVELOPMENT_PROGRESS.md` (Updated)

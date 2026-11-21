@@ -437,3 +437,78 @@ sequenceDiagram
 
 
 
+
+---
+
+#### 6.8 Reservation Service Contracts (`reservation-service` :8011)
+- **Role**: Table booking engine, floor scheduling, capacity conflict prevention, instant walk-in seating, and operational dashboard KPIs.
+- **Inbound Public Endpoints (Whitelisted on API Gateway)**:
+  - `GET /api/v1/reservations/public/branches/:branchId/slots`: Real-time available booking time slots based on branch operating hours.
+  - `GET /api/v1/reservations/public/branches/:branchId/availability`: Table availability query by date, time, and party size.
+  - `POST /api/v1/reservations/public/book`: Guest self-service table booking.
+  - `GET /api/v1/reservations/public/lookup`: Booking retrieval by reservation ID and guest phone.
+  - `POST /api/v1/reservations/public/:id/cancel`: Self-service booking cancellation with phone verification.
+- **Inbound Customer Endpoints (RBAC: `CUSTOMER`, `RESTAURANT_MANAGER`, `SUPER_ADMIN`)**:
+  - `GET /api/v1/reservations/my-bookings`: Authenticated customer's personal reservation history.
+  - `POST /api/v1/reservations/my-bookings`: Authenticated customer table booking.
+  - `PATCH /api/v1/reservations/my-bookings/:id/cancel`: Customer cancels personal booking.
+- **Inbound Staff / Admin Endpoints (RBAC: `SUPER_ADMIN`, `RESTAURANT_MANAGER`, `WAITSTAFF`, `HOSTESS`)**:
+  - `GET /api/v1/reservations`: Filtered reservation search with pagination.
+  - `GET /api/v1/reservations/summary`: Operational daily KPIs (bookings, seated, no-shows, covers).
+  - `GET /api/v1/reservations/timeline`: Visual floor schedule and Gantt timeline data.
+  - `GET /api/v1/reservations/:id`: Single reservation inspection.
+  - `POST /api/v1/reservations`: Staff phone/concierge booking creation.
+  - `PUT /api/v1/reservations/:id`: Update booking party size, date, or time slot.
+  - `PATCH /api/v1/reservations/:id/status`: Advance status (`CONFIRMED -> SEATED -> COMPLETED`).
+  - `PATCH /api/v1/reservations/:id/assign-table`: Concurrency-guarded table assignment.
+  - `PATCH /api/v1/reservations/:id/release-table`: Unassign table from reservation.
+  - `POST /api/v1/reservations/walk-in`: Immediate walk-in seating at assigned table.
+  - `GET /api/v1/reservations/:id/history`: Audit log inspection.
+  - `POST /api/v1/reservations/sweep-no-shows`: Automated overdue booking sweep.
+- **Downstream Dependency (`restaurant-service` :8003)**:
+  - Invokes `PATCH /api/v1/tables/:tableId/status` with `X-Internal-Service-Key` to synchronize table status:
+    - Sets `currentStatus = 'OCCUPIED'` when a reservation or walk-in is `SEATED`.
+    - Sets `currentStatus = 'AVAILABLE'` when a reservation is `COMPLETED`, `CANCELLED`, or released.
+  - Invokes `GET /api/v1/branches/:id` to retrieve branch opening/closing hours.
+- **Downstream Dependency (`notification-service` :8012)**:
+  - Invokes `POST /api/v1/notifications/internal/broadcast` with `X-Internal-Service-Key` to alert hostesses and floor managers on `RESERVATION_CREATED`, `RESERVATION_SEATED`, `RESERVATION_COMPLETED`, `RESERVATION_CANCELLED`, and `WALK_IN_SEATED` events.
+- **Internal Ledger Ownership**: Exclusive owner of `dbo.Reservations`.
+
+---
+
+#### 6.9 Report Service Contracts (`report-service` :8013)
+- **Role**: Executive reporting, cross-domain analytics aggregation, historical financial analysis, inventory audits, guest behavior tracking, and multi-format streaming document export.
+- **Inbound Endpoints (RBAC: `SUPER_ADMIN`, `RESTAURANT_MANAGER` on API Gateway)**:
+  - `GET /api/v1/reports/dashboard/summary`: Executive real-time cockpit KPIs (sales, orders, active tables, alerts).
+  - `GET /api/v1/reports/sales/daily`: Daily sales, net sales, taxes, discounts, and AOV.
+  - `GET /api/v1/reports/sales/monthly`: Monthly calendar revenue totals.
+  - `GET /api/v1/reports/sales/trends`: Time-series trend analysis (`HOUR`, `DAY`, `WEEK`, `MONTH`).
+  - `GET /api/v1/reports/sales/by-branch`: Multi-branch comparative sales scorecard.
+  - `GET /api/v1/reports/sales/by-restaurant`: Enterprise multi-unit restaurant portfolio rollup.
+  - `GET /api/v1/reports/sales/by-item`: Dish sales volume, unit pricing, gross and net contribution.
+  - `GET /api/v1/reports/sales/by-category`: Category-level sales distribution.
+  - `GET /api/v1/reports/revenue/summary`: Financial reconciliation (Gross, Net, Collections, Refunds, Net Revenue).
+  - `GET /api/v1/reports/revenue/by-payment-method`: Collections categorized by payment channel.
+  - `GET /api/v1/reports/revenue/refunds`: Complete audit log of processed refunds.
+  - `GET /api/v1/reports/orders/summary`: Order fulfillment and dining-type distribution.
+  - `GET /api/v1/reports/orders/peak-hours`: Hourly kitchen and front-of-house load breakdown.
+  - `GET /api/v1/reports/orders/top-items`: Pareto ranking of top selling menu dishes.
+  - `GET /api/v1/reports/inventory/summary`: Current stock levels, units of measure, and reorder levels.
+  - `GET /api/v1/reports/inventory/low-stock`: Critical ingredient threshold warnings.
+  - `GET /api/v1/reports/inventory/transactions`: Inventory ledger movements (`PURCHASE_RECEIPT`, `ORDER_CONSUMPTION`, `WASTAGE_SPOILAGE`).
+  - `GET /api/v1/reports/inventory/valuation`: Total tied-up inventory capital valuation.
+  - `GET /api/v1/reports/inventory/consumption`: Theoretical BOM depletion vs. logged inventory transactions.
+  - `GET /api/v1/reports/reservations/summary`: Reservation volume, covers, cancellations, and no-show rates.
+  - `GET /api/v1/reports/reservations/trends`: Reservation velocity and dining demand curves.
+  - `GET /api/v1/reports/customers/summary`: Guest acquisition, active repeat diners, and retention metrics.
+  - `GET /api/v1/reports/customers/top-customers`: VIP guest rankings with masked phone numbers (`****`).
+  - `GET /api/v1/reports/branches/performance`: Branch operational and financial scorecard.
+  - `GET /api/v1/reports/restaurants/performance`: Multi-restaurant enterprise comparative matrix.
+  - `GET /api/v1/reports/export/:reportType`: Streaming file downloads in Excel (`.xlsx`), CSV (`.csv`), or PDF (`.pdf`).
+- **Data Access & Read Consistency Philosophy**:
+  - Zero ORM / Zero Sequelize models; 100% parameter-bound Stored Procedures (`dbo.usp_Report_*`, SP 226–250).
+  - Read-committed isolation with CTE pre-aggregation eliminating duplicate counting across transactional joins.
+  - Redis distributed caching with dynamic TTLs (15–60s real-time, 24h historical) and `?refresh=true` cache bypass switch.
+  - Multi-branch tenancy: Managers (`RESTAURANT_MANAGER`) strictly constrained to their own branch; Super Admins (`SUPER_ADMIN`) granted global visibility.
+- **Internal Ledger Ownership**: Read-only cross-domain analytical consumer over transactional tables (`dbo.Orders`, `dbo.OrderItems`, `dbo.Payments`, `dbo.PaymentRefunds`, `dbo.InventoryItems`, `dbo.InventoryTransactions`, `dbo.Reservations`, `dbo.Customers`, `dbo.Branches`, `dbo.Restaurants`). Zero direct table mutations.
+

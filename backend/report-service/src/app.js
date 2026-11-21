@@ -18,6 +18,7 @@ const {
 } = require('@rms/shared');
 
 const healthRoutes = require('./routes/health');
+const reportRoutes = require('./routes/report.routes');
 
 const logger = createServiceLogger('report-service');
 const app = express();
@@ -29,7 +30,12 @@ app.use(createRequestLogger(logger));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health checks
 app.use(healthRoutes);
+
+// Master Report and Executive Analytics Routes
+app.use('/api/v1/reports', reportRoutes);
+app.use('/', reportRoutes);
 
 app.use((req, res) => {
   return errorResponse(res, {
@@ -42,4 +48,3 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 module.exports = { app, logger };
-
