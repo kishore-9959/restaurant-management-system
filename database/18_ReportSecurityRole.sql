@@ -6,7 +6,7 @@
 --              approved reporting stored procedures (SPs 226–250).
 --              Explicitly denies direct SELECT and mutating DML on dbo schema to ensure
 --              zero direct table query or write capability outside stored procedures.
--- Database Target: RestaurantManagementDB_IsolatedTest ONLY
+-- Database Target: RestaurantManagementDB / RestaurantManagementDB_IsolatedTest
 -- ============================================================================
 
 SET ANSI_NULLS ON;
@@ -14,12 +14,12 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
--- 0. Strict Safety Guard: Restrict execution strictly to RestaurantManagementDB_IsolatedTest
+-- 0. Target Database Safety Guard: Validate Authorized RMS Databases
 DECLARE @CurrentDB NVARCHAR(128) = DB_NAME();
-IF @CurrentDB <> 'RestaurantManagementDB_IsolatedTest'
+IF @CurrentDB NOT IN ('RestaurantManagementDB', 'RestaurantManagementDB_IsolatedTest')
 BEGIN
-    RAISERROR('STRICT SAFETY GUARD: 18_ReportSecurityRole.sql must ONLY be executed against RestaurantManagementDB_IsolatedTest. Current database is [%s]. Aborting.', 16, 1, @CurrentDB);
-    RETURN;
+    RAISERROR('SAFETY GUARD: 18_ReportSecurityRole.sql can only be executed against [RestaurantManagementDB] or [RestaurantManagementDB_IsolatedTest]. Current database is [%s]. Aborting entire script.', 16, 1, @CurrentDB);
+    SET NOEXEC ON; -- Halts execution across all subsequent GO batches in SSMS / sqlcmd
 END
 GO
 
@@ -71,7 +71,7 @@ GRANT EXECUTE ON dbo.usp_Report_BranchPerformance TO [db_reporting_reader];
 GRANT EXECUTE ON dbo.usp_Report_RestaurantPerformance TO [db_reporting_reader];
 GO
 
--- 4. Create and map report service test user [rms_report_user] if not present
+-- 4. Create and map report service user [rms_report_user] if not present
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'rms_report_user' AND type = 'S')
 BEGIN
     CREATE USER [rms_report_user] WITHOUT LOGIN;
@@ -84,4 +84,8 @@ PRINT 'Assigned [rms_report_user] to role [db_reporting_reader].';
 GO
 
 PRINT 'Successfully configured least-privilege security permissions for [db_reporting_reader].';
+GO
+
+-- Re-enable execution in case script was aborted
+SET NOEXEC OFF;
 GO

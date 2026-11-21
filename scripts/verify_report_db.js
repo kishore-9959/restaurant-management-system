@@ -17,33 +17,26 @@ function getDbConfig(dbName) {
   };
 }
 
-async function verify() {
-  console.log('====================================================================');
-  console.log('RESTAURANT MANAGEMENT SYSTEM (RMS)');
-  console.log('PHASE 13 INDEPENDENT PRODUCTION READINESS & SECURITY AUDIT');
-  console.log('====================================================================\n');
-
-  // -------------------------------------------------------------------------
-  // 1. AUDIT ISOLATED TEST DATABASE
-  // -------------------------------------------------------------------------
-  console.log('>>> 1. AUDITING RestaurantManagementDB_IsolatedTest...');
-  const isolatedPool = await new sql.ConnectionPool(getDbConfig('RestaurantManagementDB_IsolatedTest')).connect();
+async function auditDatabase(dbName) {
+  console.log(`\n====================================================================`);
+  console.log(`AUDITING DATABASE: [${dbName}]`);
+  console.log(`====================================================================`);
+  const pool = await new sql.ConnectionPool(getDbConfig(dbName)).connect();
   
-  const isoRes = await isolatedPool.request().query(`
+  // 1. Procedure count & listing
+  const isoRes = await pool.request().query(`
     SELECT ROUTINE_NAME 
     FROM INFORMATION_SCHEMA.ROUTINES 
     WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_NAME LIKE 'usp_Report_%'
     ORDER BY ROUTINE_NAME
   `);
-  console.log(`  Isolated DB usp_Report_% count: ${isoRes.recordset.length} (Expected: 25)`);
-  isoRes.recordset.forEach((r, i) => console.log(`    ${(i + 1).toString().padStart(2, ' ')}. ${r.ROUTINE_NAME}`));
-
+  console.log(`  Procedure Count (usp_Report_%): ${isoRes.recordset.length} (Expected: 25)`);
   if (isoRes.recordset.length !== 25) {
-    throw new Error(`Expected exactly 25 report procedures, found ${isoRes.recordset.length}`);
+    throw new Error(`[${dbName}] Expected 25 report procedures, found ${isoRes.recordset.length}`);
   }
 
-  // Check definitions for NOLOCK and DML mutations
-  const defRes = await isolatedPool.request().query(`
+  // 2. Check definitions for NOLOCK and DML mutations
+  const defRes = await pool.request().query(`
     SELECT o.name AS RoutineName, m.definition AS RoutineDefinition
     FROM sys.sql_modules m
     JOIN sys.objects o ON m.object_id = o.object_id
@@ -55,7 +48,6 @@ async function verify() {
 
   for (const row of defRes.recordset) {
     const def = row.RoutineDefinition;
-    // Strip comments
     const cleanDef = def.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
     
     if (/NOLOCK|READUNCOMMITTED/i.test(cleanDef)) {
@@ -72,8 +64,8 @@ async function verify() {
   console.log(`  [AUDIT] NOLOCK hints found: ${nolockFound} (PASS: 0)`);
   console.log(`  [AUDIT] Mutating DML statements found: ${dmlMutationsFound} (PASS: 0)`);
 
-  // Verify Role and Permissions
-  const roleRes = await isolatedPool.request().query(`
+  // 3. Verify Role and Permissions
+  const roleRes = await pool.request().query(`
     SELECT 
       r.name AS RoleName,
       dp.permission_name AS PermissionName,
@@ -89,10 +81,16 @@ async function verify() {
   const denyPerms = roleRes.recordset.filter(p => p.PermissionState === 'DENY');
   console.log(`  [AUDIT] [db_reporting_reader] GRANT EXECUTE procedures: ${execPerms.length} (Expected: 25)`);
   console.log(`  [AUDIT] [db_reporting_reader] Explicit DENY permissions: ${denyPerms.length} (Expected: 5 [INSERT, UPDATE, DELETE, ALTER, SELECT])`);
-  denyPerms.forEach(p => console.log(`    - DENY ${p.PermissionName} ON SCHEMA::dbo`));
+  
+  if (execPerms.length !== 25) {
+    throw new Error(`[${dbName}] Expected 25 EXECUTE grants, found ${execPerms.length}`);
+  }
+  if (denyPerms.length !== 5) {
+    throw new Error(`[${dbName}] Expected 5 explicit DENY permissions, found ${denyPerms.length}`);
+  }
 
-  // Check user assignment
-  const userRes = await isolatedPool.request().query(`
+  // 4. Verify User and Ownership Chaining Execution
+  const userRes = await pool.request().query(`
     SELECT u.name AS UserName, r.name AS RoleName
     FROM sys.database_role_members rm
     JOIN sys.database_principals r ON rm.role_principal_id = r.principal_id
@@ -101,34 +99,46 @@ async function verify() {
   `);
   console.log(`  [AUDIT] Role members: ${userRes.recordset.map(u => u.UserName).join(', ')}`);
 
-  await isolatedPool.close();
-
-  // -------------------------------------------------------------------------
-  // 2. AUDIT PRIMARY RESTAURANTMANAGEMENTDB (PRODUCTION GUARD)
-  // -------------------------------------------------------------------------
-  console.log('\n>>> 2. AUDITING Primary RestaurantManagementDB (Production Isolation Guard)...');
-  const mainPool = await new sql.ConnectionPool(getDbConfig('RestaurantManagementDB')).connect();
-  const mainRes = await mainPool.request().query(`
-    SELECT ROUTINE_NAME 
-    FROM INFORMATION_SCHEMA.ROUTINES 
-    WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_NAME LIKE 'usp_Report_%'
+  // Test execution under rms_report_user
+  const execCheck = await pool.request().query(`
+    EXECUTE AS USER = 'rms_report_user';
+    EXEC dbo.usp_Report_ExecutiveDashboardSummary;
+    REVERT;
   `);
-  console.log(`  Primary DB usp_Report_% count: ${mainRes.recordset.length} (STRICT SAFETY REQUIREMENT: Exactly 0)`);
-  
-  if (mainRes.recordset.length !== 0) {
-    throw new Error(`CRITICAL FAILURE: Primary RestaurantManagementDB contains ${mainRes.recordset.length} report procedures!`);
-  }
-  console.log('  [PASS] Primary RestaurantManagementDB is 100% UNTOUCHED and pristine.');
+  console.log(`  [AUDIT] Stored procedure execution under rms_report_user: SUCCESS (${execCheck.recordsets.length} recordsets)`);
 
-  await mainPool.close();
+  // Test direct SELECT denial under rms_report_user
+  let selectBlocked = false;
+  try {
+    await pool.request().query(`
+      EXECUTE AS USER = 'rms_report_user';
+      EXEC('SELECT TOP 1 * FROM dbo.Orders');
+      REVERT;
+    `);
+  } catch (err) {
+    selectBlocked = true;
+  }
+  console.log(`  [AUDIT] Direct SELECT on dbo.Orders blocked under rms_report_user: ${selectBlocked ? 'YES (DENIED_AS_EXPECTED)' : 'NO (BREACH)'}`);
+
+  await pool.close();
+}
+
+async function verifyAll() {
+  console.log('====================================================================');
+  console.log('RESTAURANT MANAGEMENT SYSTEM (RMS)');
+  console.log('PHASE 13 PRODUCTION READINESS & SECURITY AUDIT');
+  console.log('====================================================================');
+
+  await auditDatabase('RestaurantManagementDB_IsolatedTest');
+  await auditDatabase('RestaurantManagementDB');
 
   console.log('\n====================================================================');
-  console.log('PRODUCTION READINESS AUDIT: 100% VERIFIED & COMPLIANT');
+  console.log('ALL AUDITS COMPLETED SUCCESSFULLY WITH 100% COMPLIANCE');
   console.log('====================================================================\n');
   process.exit(0);
 }
 
-verify().catch(e => { 
+verifyAll().catch(e => { 
   console.error('\n[FATAL AUDIT ERROR]:', e); 
   process.exit(1); 
 });

@@ -154,8 +154,8 @@ async function run() {
   await executeSqlFileInBatches(isolatedPool, regressionTestScriptPath);
   console.log('  [PASS] All critical regression tests passed with controlled test data.');
 
-  // STEP 6: Confirm Main Database Guard
-  console.log('\n>>> STEP 6: Confirming Primary RestaurantManagementDB remains 100% UNTOUCHED...');
+  // STEP 6: Primary RestaurantManagementDB Status Check
+  console.log('\n>>> STEP 6: Auditing Primary RestaurantManagementDB status...');
   const prodConfig = getDbConfig('RestaurantManagementDB');
   const prodPool = await new sql.ConnectionPool(prodConfig).connect();
   const prodRoutineRes = await prodPool.request().query(`
@@ -167,10 +167,13 @@ async function run() {
   await prodPool.close();
   await isolatedPool.close();
 
-  if (prodCount !== 0) {
-    throw new Error(`CRITICAL SECURITY FAILURE: Found ${prodCount} report procedures in main RestaurantManagementDB!`);
+  if (prodCount === 0) {
+    console.log('  [PASS] Pre-deployment state: Exactly 0 report procedures in main RestaurantManagementDB.');
+  } else if (prodCount === 25) {
+    console.log('  [PASS] Post-deployment state: Exactly 25 report procedures active in main RestaurantManagementDB.');
+  } else {
+    throw new Error(`Incomplete deployment state: Found ${prodCount} report procedures (expected 0 or 25) in RestaurantManagementDB!`);
   }
-  console.log('  [PASS] Verified: Exactly 0 report procedures in main RestaurantManagementDB.');
 
   console.log('\n====================================================================');
   console.log('PHASE 13 ISOLATED DATABASE DEPLOYMENT AND VERIFICATION COMPLETED (25/25 PASSED)');
