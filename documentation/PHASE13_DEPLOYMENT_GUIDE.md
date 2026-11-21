@@ -18,21 +18,39 @@
 
 ---
 
-## 2. Pre-Deployment Verification
+## 2. Pre-Deployment Verification & Prerequisites Checklist
 
-Before applying changes to the primary database `RestaurantManagementDB`, verify that:
-1. SQL Server instance is reachable on port 1435.
-2. `RestaurantManagementDB` has RCSI enabled:
-   ```sql
-   SELECT name, is_read_committed_snapshot_on 
-   FROM sys.databases 
-   WHERE name = 'RestaurantManagementDB';
-   -- Expected: 1 (RCSI ON)
-   ```
-3. Test suite in isolated DB has passed 100%:
-   ```powershell
-   & "C:\Program Files\nodejs\node.exe" scripts/test_phase13.js
-   ```
+Before applying changes to the primary database `RestaurantManagementDB`, verify the following checklist:
+
+- [ ] **1. SQL Server Instance Connectivity:** Ensure SQL Server is reachable on port 1435.
+- [ ] **2. Read Committed Snapshot Isolation (RCSI):** Verify RCSI is active on `RestaurantManagementDB`:
+  ```sql
+  SELECT name, is_read_committed_snapshot_on 
+  FROM sys.databases 
+  WHERE name = 'RestaurantManagementDB';
+  -- Expected: 1 (RCSI ON)
+  ```
+- [ ] **3. Isolated Test Verification:** Ensure the master Phase 13 test suite has passed 100%:
+  ```powershell
+  & "C:\Program Files\nodejs\node.exe" scripts/test_phase13.js
+  ```
+- [ ] **4. Dedicated Production Login Provisioning (DBA Task):**
+  Provision a dedicated server-level login for `report-service` rather than using `sa`:
+  ```sql
+  USE [master];
+  IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'rms_report_svc_user')
+  BEGIN
+      CREATE LOGIN [rms_report_svc_user] WITH PASSWORD = 'StrongRandomPassword123!', CHECK_POLICY = ON;
+  END;
+  GO
+  ```
+- [ ] **5. Safety Guard Target Update:**
+  In `database/17_ReportStoredProcedures.sql` and `database/18_ReportSecurityRole.sql`, update line 18 from:
+  `IF DB_NAME() <> 'RestaurantManagementDB_IsolatedTest'`
+  to:
+  `IF DB_NAME() <> 'RestaurantManagementDB'`
+  *(This update must only be performed after explicit human approval).*
+- [ ] **6. Maintenance Window:** Schedule execution during off-peak hours (e.g. 02:00–04:00 AM) to minimize concurrency impact during Schema Modification (`Sch-M`) lock acquisition.
 
 ---
 

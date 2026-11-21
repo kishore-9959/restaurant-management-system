@@ -99,6 +99,14 @@ To prevent accidental exclusion of transactions occurring later on a requested c
   - **Query Params**: `startDate`, `endDate`, `branchId`
   - **Stored Procedure**: `dbo.usp_Report_RevenueSummary`
   - **Description**: Reconciles Gross Sales, Net Sales, Collected Revenue, Refunds, and Net Revenue ($Collected - Refunds$).
+  - **Financial Metrics & Reconciliation Formulas**:
+    - **Gross Sales**: $\sum(\text{TotalAmount}) + \sum(\text{DiscountAmount})$ across valid orders.
+    - **Net Sales**: $\sum(\text{TotalAmount}) - \sum(\text{DiscountAmount}) + \sum(\text{TaxAmount})$ across valid orders (`CONFIRMED`, `PREPARING`, `READY`, `SERVED`, `COMPLETED`).
+    - **Collected Revenue**: $\sum(\text{PaymentTransactions.Amount})$ where `Status = 'SUCCESS'` and `TransactionType IN ('PAYMENT', 'CAPTURE')`.
+    - **Processed Refunds**: $\sum(\text{PaymentRefunds.Amount})$ where `Status = 'COMPLETED'`.
+    - **Net Revenue**: $\text{Collected Revenue} - \text{Processed Refunds}$.
+    - **ReconciliationDifference**: $\text{Net Sales} - \text{Net Revenue}$ (Signed difference; indicates over/under collection relative to invoiced sales).
+    - **ReconciliationDiscrepancy**: $|\text{Net Sales} - \text{Net Revenue}|$ (Unsigned absolute dollar discrepancy magnitude for auditing).
 - **`GET /api/v1/reports/revenue/by-payment-method`**
   - **Query Params**: `startDate`, `endDate`, `branchId`
   - **Stored Procedure**: `dbo.usp_Report_RevenueByPaymentMethod`

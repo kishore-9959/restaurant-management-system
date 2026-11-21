@@ -39,6 +39,15 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
+-- 0. Strict Safety Guard: Restrict execution strictly to RestaurantManagementDB_IsolatedTest
+SELECT DB_NAME() AS CurrentDatabase;
+IF DB_NAME() <> 'RestaurantManagementDB_IsolatedTest'
+BEGIN
+    SET NOEXEC ON;
+    THROW 51000, 'SAFETY STOP: Phase 13 modifications are permitted only in RestaurantManagementDB_IsolatedTest.', 1;
+END;
+GO
+
 -------------------------------------------------------------------------------
 -- PROCEDURE 226: dbo.usp_Report_ExecutiveDashboardSummary
 -- Description: High-level KPI cockpit aggregating sales, collections, covers,
@@ -215,6 +224,10 @@ BEGIN
     IF @StartDate IS NULL
         SET @StartDate = DATEADD(DAY, -30, @EndDate);
 
+    -- Direct range timestamps for index seek preservation (SARGable)
+    DECLARE @StartDT DATETIME2(3) = CAST(@StartDate AS DATETIME2(3));
+    DECLARE @EndDT DATETIME2(3) = DATEADD(MILLISECOND, -1, DATEADD(DAY, 1, CAST(CAST(@EndDate AS DATE) AS DATETIME2(3))));
+
     SELECT
         CAST(o.CreatedAt AS DATE) AS SaleDate,
         COUNT(1) AS TotalOrders,
@@ -234,8 +247,7 @@ BEGIN
     FROM dbo.Orders o
     WHERE o.IsDeleted = 0
       AND (@BranchId IS NULL OR o.BranchId = @BranchId)
-      AND CAST(o.CreatedAt AS DATE) >= @StartDate 
-      AND CAST(o.CreatedAt AS DATE) <= @EndDate
+      AND o.CreatedAt >= @StartDT AND o.CreatedAt <= @EndDT
     GROUP BY CAST(o.CreatedAt AS DATE)
     ORDER BY SaleDate ASC;
 END;
@@ -669,7 +681,8 @@ BEGIN
 
     -- 4. Net Revenue Calculation
     DECLARE @NetRevenue DECIMAL(14,2) = @CollectedRevenue - @ProcessedRefunds;
-    DECLARE @ReconciliationDiscrepancy DECIMAL(14,2) = @NetSales - @NetRevenue;
+    DECLARE @ReconciliationDifference DECIMAL(14,2) = @NetSales - @NetRevenue;
+    DECLARE @ReconciliationDiscrepancy DECIMAL(14,2) = ABS(@NetSales - @NetRevenue);
 
     SELECT
         @BranchId AS BranchId,
@@ -686,6 +699,7 @@ BEGIN
         @ProcessedRefundsCount AS ProcessedRefundsCount,
         @ProcessedRefunds AS ProcessedRefunds,
         @NetRevenue AS NetRevenue,
+        @ReconciliationDifference AS ReconciliationDifference,
         @ReconciliationDiscrepancy AS ReconciliationDiscrepancy;
 END;
 GO
@@ -1565,4 +1579,7 @@ BEGIN
     WHERE r.IsDeleted = 0
     ORDER BY NetSales DESC;
 END;
+GO
+
+SET NOEXEC OFF;
 GO

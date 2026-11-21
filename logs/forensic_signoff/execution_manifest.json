@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "name": "Phase 13 Database Stored Procedures Tests",
+    "file": "scripts/test_phase13_database.js",
+    "startTime": "2026-11-21T12:04:34.515Z",
+    "endTime": "2026-11-21T12:04:39.938Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_1_test_phase13_database.log",
+    "outputSnippet": "  [SQL OUTPUT] ====================================================================\n  [SQL OUTPUT] ALL 10 CRITICAL REGRESSION TESTS PASSED WITH 100% SUCCESS RATE!\n  [SQL OUTPUT] ====================================================================\n  [SQL OUTPUT] Regression test transaction cleanly rolled back. Test database state preserved.\n  [PASS] All critical regression tests passed with controlled test data.\n\n>>> STEP 6: Auditing Primary RestaurantManagementDB status...\n  [PASS] Post-deployment state: Exactly 25 report procedures active in main RestaurantManagementDB.\n\n====================================================================\nPHASE 13 ISOLATED DATABASE DEPLOYMENT AND VERIFICATION COMPLETED (25/25 PASSED)\nNOTE: Main RestaurantManagementDB preserved untouched per instructions.\n====================================================================\n\n"
+  },
+  {
+    "id": 2,
+    "name": "Phase 13 Report Backend REST API Tests",
+    "file": "scripts/test_phase13_api.js",
+    "startTime": "2026-11-21T12:04:42.954Z",
+    "endTime": "2026-11-21T12:04:48.201Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_2_test_phase13_api.log",
+    "outputSnippet": "  [PASS] GET /export/sales-daily?format=pdf returns 200\n  [PASS] PDF export has application/pdf Content-Type\n  [PASS] PDF file received with non-trivial size (2633 bytes)\n[2026-11-21 17:34:48.054] [\u001b[32MINFO\u001b[39M] [report-service] [corr:fe64d834-6c9a-4d98-8d94-701539c701c0]: GET /api/v1/reports/export/revenue-methods?format=excel - 200 (50ms) | {\"statusCode\":200,\"durationMs\":50,\"ip\":\"::1\"}\r\n  [PASS] GET /export/revenue-methods?format=excel returns 200\n[2026-11-21 17:34:48.089] [\u001b[32MINFO\u001b[39M] [report-service] [corr:a70c2382-f7bf-47c0-86cf-71350241a7d3]: GET /api/v1/reports/export/inventory-stock?format=csv - 200 (33ms) | {\"statusCode\":200,\"durationMs\":33,\"ip\":\"::1\"}\r\n  [PASS] GET /export/inventory-stock?format=csv returns 200\n[2026-11-21 17:34:48.162] [\u001b[32MINFO\u001b[39M] [report-service] [corr:55e330f4-b7b8-47ec-8c07-6ced1f0a60cc]: GET /api/v1/reports/export/top-items?format=pdf - 200 (71ms) | {\"statusCode\":200,\"durationMs\":71,\"ip\":\"::1\"}\r\n  [PASS] GET /export/top-items?format=pdf returns 200\n\n================================================================================\n  PHASE 13 API SUITE COMPLETE: 76 PASSED, 0 FAILED\n================================================================================\n\n"
+  },
+  {
+    "id": 3,
+    "name": "Phase 13 Security, RBAC & Tenancy Tests",
+    "file": "scripts/test_phase13_security.js",
+    "startTime": "2026-11-21T12:04:51.210Z",
+    "endTime": "2026-11-21T12:04:55.369Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_3_test_phase13_security.log",
+    "outputSnippet": "--- 4. Branch Tenancy Isolation ---\n[2026-11-21 17:34:55.334] [\u001b[32MINFO\u001b[39M] [report-service] [corr:2de63bc7-6999-4c3f-a134-2e9664699ba5]: GET /api/v1/reports/dashboard/summary?branchId=99 - 200 (74ms) | {\"statusCode\":200,\"durationMs\":74,\"ip\":\"::1\"}\r\n  [PASS] Manager request returns 200\n  [PASS] Server enforces manager verified branchId (1) instead of requested branchId (99)\n\n--- 5. Customer PII Data Masking ---\n[2026-11-21 17:34:55.339] [\u001b[32MINFO\u001b[39M] [report-service] [corr:9cf22cd1-3ec5-47db-ac2d-5d81c76f371c]: GET /api/v1/reports/customers/top-customers - 200 (2ms) | {\"statusCode\":200,\"durationMs\":2,\"ip\":\"::1\"}\r\n  [PASS] GET /customers/top-customers returns 200\n  [INFO] No top customer records in test DB; query structure validated.\n\n================================================================================\n  PHASE 13 SECURITY SUITE COMPLETE: 12 PASSED, 0 FAILED\n================================================================================\n\n"
+  },
+  {
+    "id": 4,
+    "name": "Phase 13 Admin Analytics Dashboard Frontend Tests",
+    "file": "scripts/test_phase13_frontend.js",
+    "startTime": "2026-11-21T12:04:58.379Z",
+    "endTime": "2026-11-21T12:04:59.872Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_4_test_phase13_frontend.log",
+    "outputSnippet": "  [PASS] Dynamic date range calculations exist\n\n--- 4. Route Isolation & Decoupling ---\n  [PASS] AppRoutes registers /admin/analytics\n  [PASS] AppRoutes registers /admin/reports alias\n\n--- 5. Public Customer Navigation Protection ---\n  [PASS] Public customer Header has zero admin analytics links\n  [PASS] Public customer Header has zero admin report links\n\n================================================================================\n  PHASE 13 FRONTEND SUITE COMPLETE: 19 PASSED, 0 FAILED\n================================================================================\n\n"
+  },
+  {
+    "id": 5,
+    "name": "Phase 13 Gateway Routing & Redis Integration Tests",
+    "file": "scripts/test_phase13_integration.js",
+    "startTime": "2026-11-21T12:05:02.881Z",
+    "endTime": "2026-11-21T12:05:06.835Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_5_test_phase13_integration.log",
+    "outputSnippet": "[2026-11-21 17:35:06.775] [\u001b[32MINFO\u001b[39M] [report-service] [corr:d14a7f34-b86d-4888-868b-ad57014ffadd]: GET /api/v1/reports/dashboard/summary?branchId=1 - 200 (603ms) | {\"statusCode\":200,\"durationMs\":603,\"ip\":\"::1\"}\r\n  [PASS] Initial call returns 200\n  [PASS] Initial call is a cache MISS (fromCache: false)\n[2026-11-21 17:35:06.784] [\u001b[32MINFO\u001b[39M] [report-service] [corr:b074de03-0e3a-4ada-8007-51b0612a55c4]: GET /api/v1/reports/dashboard/summary?branchId=1 - 200 (2ms) | {\"statusCode\":200,\"durationMs\":2,\"ip\":\"::1\"}\r\n  [PASS] Second call returns 200\n  [PASS] Repeated call within TTL is a cache HIT (fromCache: true)\n[2026-11-21 17:35:06.797] [\u001b[32MINFO\u001b[39M] [report-service] [corr:6ef43b5d-03a0-42bc-be2c-b82b2401f04f]: GET /api/v1/reports/dashboard/summary?branchId=1&refresh=true - 200 (11ms) | {\"statusCode\":200,\"durationMs\":11,\"ip\":\"::1\"}\r\n  [PASS] Refresh call returns 200\n  [PASS] ?refresh=true forces cache bypass (fromCache: false)\n\n================================================================================\n  PHASE 13 INTEGRATION SUITE COMPLETE: 12 PASSED, 0 FAILED\n================================================================================\n\n"
+  },
+  {
+    "id": 6,
+    "name": "Phase 13 Master Orchestration Test Runner",
+    "file": "scripts/test_phase13.js",
+    "startTime": "2026-11-21T12:05:09.849Z",
+    "endTime": "2026-11-21T12:05:30.721Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_6_test_phase13.log",
+    "outputSnippet": "\n================================================================================\n  PHASE 13 INTEGRATION SUITE COMPLETE: 12 PASSED, 0 FAILED\n================================================================================\n\n>>> SUITE PASSED: 5. Gateway Routing & Redis Caching Suite\n\n================================================================================\n  MASTER PHASE 13 SUMMARY: 5 / 5 SUITES PASSED\n================================================================================\n\n>>> ALL PHASE 13 TEST SUITES PASSED WITH 100% SUCCESS RATE! <<<\n\nStrict Restriction Verified: Main RestaurantManagementDB preserved untouched.\n"
+  },
+  {
+    "id": 7,
+    "name": "Phase 10 Master Regression Test Runner",
+    "file": "scripts/test_phase10.js",
+    "startTime": "2026-11-21T12:05:33.726Z",
+    "endTime": "2026-11-21T12:48:10.993Z",
+    "exitCode": 1,
+    "passed": false,
+    "logFile": "logs\\forensic_signoff\\stage_7_test_phase10.log",
+    "outputSnippet": "Socket.IO server running on port 8012\n\n--- Group 1: Handshake Authentication ---\n\nSocket.IO test server closed.\n\n===============================================================\nSOCKET.IO TEST RESULTS: 0 PASSED, 1 FAILED\n===============================================================\n\n>>> EXECUTING: End-to-End Inter-Service Integration Tests (scripts/test_phase10_integration.js)\n\nUnhandled Test Exception: timeout\n>>> SUITE FAILED: Socket.IO Real-Time Hub Tests - spawnSync C:\\Windows\\system32\\cmd.exe ETIMEDOUT\n"
+  },
+  {
+    "id": 8,
+    "name": "Phase 11 Master Regression Test Runner",
+    "file": "scripts/test_phase11.js",
+    "startTime": "2026-11-21T12:48:14.502Z",
+    "endTime": "2026-11-21T12:48:46.671Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_8_test_phase11.log",
+    "outputSnippet": "[2026-11-21 18:18:46.510] [\u001b[33MWARN\u001b[39M] [api-gateway] [corr:6cd0807d-224b-4425-ad03-29faf58632f1]: POST /api/v1/cms/admin/banners - 403 (4ms) | {\"statusCode\":403,\"durationMs\":4,\"ip\":\"::1\"}\r\n  [PASS] WAITSTAFF token rejected on CMS admin endpoint with 403 Forbidden\n\n================================================================================\n  PHASE 11 INTEGRATION SUMMARY: 22 PASSED, 0 FAILED\n================================================================================\n>>> SUITE PASSED: End-to-End Inter-Service Integration Suite\n\n================================================================================\n  MASTER PHASE 11 SUMMARY: 4 / 4 SUITES PASSED\n================================================================================\n\n>>> ALL PHASE 11 TEST SUITES PASSED WITH 100% SUCCESS RATE! <<<\n\n"
+  },
+  {
+    "id": 9,
+    "name": "Phase 12 Master Regression Test Runner",
+    "file": "scripts/test_phase12.js",
+    "startTime": "2026-11-21T12:48:49.690Z",
+    "endTime": "2026-11-21T12:49:10.188Z",
+    "exitCode": 1,
+    "passed": false,
+    "logFile": "logs\\forensic_signoff\\stage_9_test_phase12.log",
+    "outputSnippet": "PHASE 12 INTEGRATION TEST RESULTS\nTotal Passed: 14\nTotal Failed: 2\n================================================================================\n\n================================================================================\n  MASTER PHASE 12 SUMMARY: 3 / 4 SUITES PASSED\n================================================================================\n\n(node:28572) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\n  [FAIL] Restaurant Service synchronized Table 3 status to OCCUPIED - \n  [FAIL] Restaurant Service synchronized Table 3 status back to AVAILABLE - \n>>> SUITE FAILED: End-to-End Inter-Service Integration Suite - Command failed: \"C:\\Program Files\\nodejs\\node.exe\" scripts/test_phase12_integration.js\n"
+  },
+  {
+    "id": 10,
+    "name": "Independent Dual-Database Report Audit",
+    "file": "scripts/verify_report_db.js",
+    "startTime": "2026-11-21T12:49:13.206Z",
+    "endTime": "2026-11-21T12:49:18.263Z",
+    "exitCode": 0,
+    "passed": true,
+    "logFile": "logs\\forensic_signoff\\stage_10_verify_report_db.log",
+    "outputSnippet": "====================================================================\n  Procedure Count (usp_Report_%): 25 (Expected: 25)\n  [AUDIT] NOLOCK hints found: 0 (PASS: 0)\n  [AUDIT] Mutating DML statements found: 0 (PASS: 0)\n  [AUDIT] [db_reporting_reader] GRANT EXECUTE procedures: 25 (Expected: 25)\n  [AUDIT] [db_reporting_reader] Explicit DENY permissions: 5 (Expected: 5 [INSERT, UPDATE, DELETE, ALTER, SELECT])\n  [AUDIT] Role members: rms_report_user\n  [AUDIT] Stored procedure execution under rms_report_user: SUCCESS (3 recordsets)\n  [AUDIT] Direct SELECT on dbo.Orders blocked under rms_report_user: YES (DENIED_AS_EXPECTED)\n\n====================================================================\nALL AUDITS COMPLETED SUCCESSFULLY WITH 100% COMPLIANCE\n====================================================================\n\n"
+  }
+]

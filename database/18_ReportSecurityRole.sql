@@ -14,13 +14,13 @@ GO
 SET QUOTED_IDENTIFIER ON;
 GO
 
--- 0. Target Database Safety Guard: Validate Authorized RMS Databases
-DECLARE @CurrentDB NVARCHAR(128) = DB_NAME();
-IF @CurrentDB NOT IN ('RestaurantManagementDB', 'RestaurantManagementDB_IsolatedTest')
+-- 0. Strict Safety Guard: Restrict execution strictly to RestaurantManagementDB_IsolatedTest
+SELECT DB_NAME() AS CurrentDatabase;
+IF DB_NAME() <> 'RestaurantManagementDB_IsolatedTest'
 BEGIN
-    RAISERROR('SAFETY GUARD: 18_ReportSecurityRole.sql can only be executed against [RestaurantManagementDB] or [RestaurantManagementDB_IsolatedTest]. Current database is [%s]. Aborting entire script.', 16, 1, @CurrentDB);
-    SET NOEXEC ON; -- Halts execution across all subsequent GO batches in SSMS / sqlcmd
-END
+    SET NOEXEC ON;
+    THROW 51000, 'SAFETY STOP: Phase 13 modifications are permitted only in RestaurantManagementDB_IsolatedTest.', 1;
+END;
 GO
 
 -- 1. Create Dedicated Reporting Role if it does not already exist

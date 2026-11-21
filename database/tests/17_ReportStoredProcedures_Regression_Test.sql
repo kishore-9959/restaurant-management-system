@@ -25,6 +25,13 @@ PRINT 'STARTING PHASE 13 REPORT STORED PROCEDURES REGRESSION TEST SUITE';
 PRINT 'Target Database: RestaurantManagementDB_IsolatedTest';
 PRINT '====================================================================';
 
+-- Strict Database Safety Guard
+SELECT DB_NAME() AS CurrentDatabase;
+IF DB_NAME() <> 'RestaurantManagementDB_IsolatedTest'
+BEGIN
+    THROW 51000, 'SAFETY STOP: Phase 13 modifications are permitted only in RestaurantManagementDB_IsolatedTest.', 1;
+END;
+
 BEGIN TRANSACTION;
 
 BEGIN TRY
@@ -295,7 +302,7 @@ BEGIN TRY
         BranchId INT, StartDate DATETIME2, EndDate DATETIME2, TotalOrders INT,
         GrossSales DECIMAL(14,2), Discounts DECIMAL(14,2), Taxes DECIMAL(14,2), AdditionalCharges DECIMAL(14,2), NetSales DECIMAL(14,2),
         SuccessfulPaymentsCount INT, CollectedRevenue DECIMAL(14,2), ProcessedRefundsCount INT, ProcessedRefunds DECIMAL(14,2),
-        NetRevenue DECIMAL(14,2), ReconciliationDiscrepancy DECIMAL(14,2)
+        NetRevenue DECIMAL(14,2), ReconciliationDifference DECIMAL(14,2), ReconciliationDiscrepancy DECIMAL(14,2)
     );
 
     -- Query May 2026:
@@ -315,10 +322,13 @@ BEGIN TRY
     EXEC dbo.usp_Report_RevenueSummary @BranchId = @TestBranchId, @StartDate = '2026-05-01', @EndDate = '2026-05-31 23:59:59';
 
     DECLARE @T3_Collected DECIMAL(14,2), @T3_Refunds DECIMAL(14,2), @T3_NetRev DECIMAL(14,2);
+    DECLARE @T3_RecDiff DECIMAL(14,2), @T3_RecDisc DECIMAL(14,2);
     SELECT 
         @T3_Collected = CollectedRevenue,
         @T3_Refunds = ProcessedRefunds,
-        @T3_NetRev = NetRevenue
+        @T3_NetRev = NetRevenue,
+        @T3_RecDiff = ReconciliationDifference,
+        @T3_RecDisc = ReconciliationDiscrepancy
     FROM @RevResult;
 
     IF @T3_Collected <> 750.00
@@ -342,7 +352,21 @@ BEGIN TRY
         RAISERROR('TEST 3 FAILED: May NetRevenue expected 470.00, got %s', 16, 1, @T3_Net_Str);
     END
 
-    PRINT '  [PASS] SP 234 verified: SettledAt collections=750.00, NULL SettledAt excluded, ProcessedAt refunds=280.00, NetRevenue=470.00.';
+    -- Reconciliation fields: NetSales (370.00) - NetRevenue (470.00) = -100.00 (preserves sign)
+    IF @T3_RecDiff <> -100.00
+    BEGIN
+        DECLARE @T3_Diff_Str NVARCHAR(30) = CAST(@T3_RecDiff AS NVARCHAR(30));
+        RAISERROR('TEST 3 FAILED: ReconciliationDifference expected -100.00, got %s', 16, 1, @T3_Diff_Str);
+    END
+
+    -- ReconciliationDiscrepancy = ABS(370.00 - 470.00) = 100.00
+    IF @T3_RecDisc <> 100.00
+    BEGIN
+        DECLARE @T3_Disc_Str NVARCHAR(30) = CAST(@T3_RecDisc AS NVARCHAR(30));
+        RAISERROR('TEST 3 FAILED: ReconciliationDiscrepancy expected 100.00, got %s', 16, 1, @T3_Disc_Str);
+    END
+
+    PRINT '  [PASS] SP 234 verified: SettledAt collections=750.00, refunds=280.00, NetRevenue=470.00, RecDifference=-100.00, RecDiscrepancy=100.00.';
 
 
     -- ========================================================================
@@ -355,10 +379,13 @@ BEGIN TRY
     EXEC dbo.usp_Report_RevenueSummary @BranchId = @TestBranchId, @StartDate = '2026-06-01', @EndDate = '2026-06-30 23:59:59';
 
     DECLARE @T4_Collected DECIMAL(14,2), @T4_Refunds DECIMAL(14,2), @T4_NetRev DECIMAL(14,2);
+    DECLARE @T4_RecDiff DECIMAL(14,2), @T4_RecDisc DECIMAL(14,2);
     SELECT 
         @T4_Collected = CollectedRevenue,
         @T4_Refunds = ProcessedRefunds,
-        @T4_NetRev = NetRevenue
+        @T4_NetRev = NetRevenue,
+        @T4_RecDiff = ReconciliationDifference,
+        @T4_RecDisc = ReconciliationDiscrepancy
     FROM @RevResult;
 
     -- June collections: Pay2 settled June 01 ($200.00)
@@ -382,7 +409,20 @@ BEGIN TRY
         RAISERROR('TEST 4 FAILED: June NetRevenue expected 50.00, got %s', 16, 1, @T4_Net_Str);
     END
 
-    PRINT '  [PASS] Multiple partial refunds across separate periods verified: June Collections=200.00, June Refunds=150.00, NetRevenue=50.00.';
+    -- June Reconciliation: NetSales (0.00) - NetRevenue (50.00) = -50.00
+    IF @T4_RecDiff <> -50.00
+    BEGIN
+        DECLARE @T4_Diff_Str NVARCHAR(30) = CAST(@T4_RecDiff AS NVARCHAR(30));
+        RAISERROR('TEST 4 FAILED: June ReconciliationDifference expected -50.00, got %s', 16, 1, @T4_Diff_Str);
+    END
+
+    IF @T4_RecDisc <> 50.00
+    BEGIN
+        DECLARE @T4_Disc_Str NVARCHAR(30) = CAST(@T4_RecDisc AS NVARCHAR(30));
+        RAISERROR('TEST 4 FAILED: June ReconciliationDiscrepancy expected 50.00, got %s', 16, 1, @T4_Disc_Str);
+    END
+
+    PRINT '  [PASS] Multiple partial refunds across separate periods verified: June Collections=200.00, Refunds=150.00, NetRevenue=50.00, RecDifference=-50.00, RecDiscrepancy=50.00.';
 
 
     -- ========================================================================
